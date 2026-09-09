@@ -1,6 +1,11 @@
 # Análise Comparativa de Sistemas de Medição de Posição Azimutal para Cúpulas Astronômicas
 
-Este documento apresenta a estruturação detalhada dos sistemas de captação de posição azimutal para cúpulas de telescópios utilizando conjunto de cremalheira, pinhão, caixa de engrenagens/redutor e encoder absoluto. Abaixo são analisadas as duas abordagens técnicas discutidas: a solução com mapeamento de 1 volta do encoder por 1 volta da cúpula e a solução com encoder multivoltas acoplado ao pinhão leitor.
+Captura Mecânica: Uma cremalheira circular fixada na base da cúpula engrena em um pinhão leitor fixo na estrutura imóvel do observatório. O engrenamento direto elimina o deslizamento (slip), garantindo repetibilidade contínua.
+Conversão Angular: O giro da cúpula aciona o pinhão, que transmite a rotação ao eixo de um encoder absoluto.
+Processamento: O encoder gera uma palavra digital contendo a posição angular exata. O controlador (PLC) lê essa contagem, aplica a relação mecânica de transmissão e calcula o azimute em tempo real ($0^\circ \text{ a } 360^\circ$).
+
+# Aprofundamento Técnico e Detalhamento das Abordagens
+Esta ideia geral pode ser implementada através de duas topologias distintas de acoplamento mecânico e codificação digital, cujos cálculos de resolução, relações de transmissão, equações e quadro comparativo estão documentados em detalhe no arquivo criado anteriormente:
 
 ---
 
