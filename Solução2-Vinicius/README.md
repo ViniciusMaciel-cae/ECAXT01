@@ -108,6 +108,7 @@ $$\text{Azimute (º)} = \left( \frac{\text{Contagem Atual do Encoder}}{\text{Res
 | **Complexidade Mecânica** | Elevada (caixa de redução extra) | Baixa (acoplamento direto) |
 | **Complexidade de Software/PLC** | Muito Baixa (direta $0-360^\circ$) | Média (mapeamento de voltas do pinhão) |
 | **Recomendação de Aplicação** | Sistemas didáticos ou de baixa precisão | Observatórios astronômicos de alta precisão |
+| **Custo**|Médio / Elevado: Embora o encoder singleturn seja mais barato individualmente, o custo mecânico global aumenta (caixa de engrenagens customizada, usinagem e manutenção contínua) | Baixo / Moderado: O sensor (multivoltas) tem um custo individual um pouco maior, mas o custo total do sistema é significativamente menor devido à extrema simplicidade mecânica |
 
 ---
 
