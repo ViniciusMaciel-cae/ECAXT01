@@ -51,7 +51,7 @@ $$\text{Azimute (º)} = \left( \frac{\text{Contagem Atual do Encoder}}{\text{Res
 ## 3. Quadro Comparativo das Soluções
 
 | Parâmetro / Característica | Solução : Direto/Multivoltas + Pinhão Leitor |
-| :--- | :--- | :--- |
+| :--- | :--- |
 | **Relação Mecânica Total ($R_t$)** | $R_t \gg 1$ (várias voltas por volta da cúpula) |
 | **Tipo de Encoder Requerido**  | Absoluto Multivoltas |
 | **Fonte da Resolução Angular**  | Multiplicação mecânica ($N_{\text{encoder}} \times R_t$) |
