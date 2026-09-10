@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SRMIE &#8212; Cupula Astronomica 3D v3</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;background:#06091a;overflow:hidden;}
+#c{position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;}
+#ui{
+  position:absolute;top:20px;left:20px;z-index:1000;width:278px;
+  pointer-events:auto;background:rgba(6,10,22,.94);
+  border:1px solid rgba(56,189,248,.18);border-radius:14px;
+  backdrop-filter:blur(14px);font-family:'Segoe UI',system-ui,sans-serif;
+  box-shadow:0 12px 48px rgba(0,0,0,.75),0 0 0 1px rgba(56,189,248,.05);
+}
+.hdr{padding:14px 16px 10px;background:linear-gradient(135deg,rgba(56,189,248,.09),rgba(52,211,153,.04));
+  border-bottom:1px solid rgba(56,189,248,.12);border-radius:14px 14px 0 0;}
+.hdr h1{font-size:11px;font-weight:800;color:#38bdf8;letter-spacing:.14em;text-transform:uppercase;}
+.hdr p{font-size:9.5px;color:#2d4060;margin-top:2px;}
+.sec{padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.05);}
+.sec:last-child{border-bottom:none;border-radius:0 0 14px 14px;}
+.slbl{font-size:9px;font-weight:700;color:#2d4060;text-transform:uppercase;letter-spacing:.13em;margin-bottom:8px;}
+.cb{display:flex;align-items:center;gap:7px;width:100%;border:1px solid rgba(255,255,255,.07);
+  background:transparent;border-radius:7px;padding:8px 10px;margin-bottom:5px;color:#546070;
+  font-size:11px;cursor:pointer;transition:all .18s;text-align:left;font-family:inherit;}
+.cb:last-child{margin-bottom:0;}
+.cb:hover{background:rgba(56,189,248,.09);color:#b0c8d8;border-color:rgba(56,189,248,.28);}
+.cb.on{background:rgba(56,189,248,.14);color:#38bdf8;border-color:rgba(56,189,248,.44);
+  box-shadow:0 0 12px rgba(56,189,248,.14);}
+.tr{display:flex;align-items:center;justify-content:space-between;padding:7px 0;
+  border-bottom:1px solid rgba(255,255,255,.04);}
+.tr:last-child{border-bottom:none;}
+.tl{font-size:11px;color:#546070;user-select:none;}
+.sw{position:relative;width:42px;height:22px;cursor:pointer;flex-shrink:0;}
+.sw input{opacity:0;position:absolute;width:0;height:0;}
+.sw-t{position:absolute;inset:0;background:#0f1e30;border-radius:11px;
+  border:1px solid rgba(255,255,255,.07);transition:.25s;}
+.sw-k{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#253545;
+  border-radius:50%;transition:.25s;}
+.sw input:checked~.sw-t{background:#0a6090;}
+.sw input:checked~.sw-k{transform:translateX(20px);background:#fff;box-shadow:0 0 8px rgba(56,189,248,.5);}
+.live{display:inline-flex;align-items:center;gap:5px;background:rgba(52,211,153,.08);
+  border:1px solid rgba(52,211,153,.2);border-radius:4px;padding:2px 7px;font-size:9px;
+  color:#34d399;margin-bottom:8px;}
+.dot{width:6px;height:6px;background:#34d399;border-radius:50%;animation:pk 1.4s ease-in-out infinite;}
+@keyframes pk{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.8)}}
+.ti{margin-bottom:10px;}.ti:last-child{margin-bottom:0;}
+.tk{font-size:9.5px;color:#2d4060;text-transform:uppercase;letter-spacing:.07em;}
+.tv{font-size:21px;font-weight:700;color:#34d399;font-variant-numeric:tabular-nums;line-height:1.2;margin-top:1px;}
+.tu{font-size:10px;font-weight:400;color:#2d4060;}
+.inf{margin-top:10px;padding:9px;background:rgba(0,0,0,.4);border-radius:7px;font-size:10px;
+  color:#2a3a50;line-height:1.8;border:1px solid rgba(255,255,255,.04);}
+.inf span{color:#38bdf8;font-weight:600;}.inf b{color:#34d399;}
+#lbls{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:500;}
+.lbl{position:absolute;display:none;background:rgba(6,10,22,.9);border:1px solid rgba(56,189,248,.4);
+  border-radius:5px;padding:3px 9px;font-size:9.5px;color:#38bdf8;white-space:nowrap;
+  font-family:'Segoe UI',sans-serif;pointer-events:none;transform:translate(-50%,-130%);}
+.lbl-r{border-color:rgba(239,68,68,.45);color:#f87171;}
+.lbl-o{border-color:rgba(251,146,60,.45);color:#fb923c;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div class="hdr">
+    <h1>SRMIE &middot; Simulador 3D</h1>
+    <p>Roda de Medi&ccedil;&atilde;o Independente com Encoder &mdash; UNIFEI/LNA</p>
+  </div>
+  <div class="sec">
+    <div class="slbl">&#x1F4CD; Pontos de Vista</div>
+    <button class="cb on" id="b-ov" onclick="setCam('ov')">&#x1F52D; C&uacute;pula Completa (Vis&atilde;o Geral)</button>
+    <button class="cb"    id="b-sr" onclick="setCam('sr')">&#x2699;&#xFE0F; Mecanismo SRMIE (Close-up)</button>
+    <button class="cb"    id="b-mo" onclick="setCam('mo')">&#x1F504; Motor de Tra&ccedil;&atilde;o (Ponto Desacoplado)</button>
+    <button class="cb"    id="b-ma" onclick="setCam('ma')">&#x1F50D; Macro: Atua&ccedil;&atilde;o da Mola</button>
+    <button class="cb"    id="b-po" onclick="setCam('po')">&#x1F6E4;&#xFE0F; POV: Contato Roda/Trilho</button>
+    <button class="cb"    id="b-dy" onclick="setCam('dy')">&#x1F3A5; C&acirc;mera Din&acirc;mica (Bra&ccedil;o)</button>
+  </div>
+  <div class="sec">
+    <div class="slbl">&#x1F3DB; Recursos &amp; Anima&ccedil;&atilde;o</div>
+    <div class="tr">
+      <span class="tl">&#x1F578;&#xFE0F; Modo Wireframe</span>
+      <label class="sw"><input type="checkbox" id="t-wf" onchange="setWire(this.checked)"><div class="sw-t"></div><div class="sw-k"></div></label>
+    </div>
+    <div class="tr">
+      <span class="tl">&#x1F504; Rota&ccedil;&atilde;o da C&uacute;pula</span>
+      <select id="s-dir" onchange="setDir(this.value)" style="background:#0f1e30;color:#38bdf8;border:1px solid rgba(56,189,248,.2);border-radius:4px;font-size:10px;padding:2px 4px;outline:none;cursor:pointer;">
+        <option value="1" selected>Direita (+)</option>
+        <option value="0">Pausado</option>
+        <option value="-1">Esquerda (-)</option>
+      </select>
+    </div>
+    <div class="tr">
+      <span class="tl">&#x1F6AA; Portas da C&uacute;pula - ON/OFF</span>
+      <label class="sw"><input type="checkbox" id="t-dr" onchange="setDoor(this.checked)"><div class="sw-t"></div><div class="sw-k"></div></label>
+    </div>
+    <div class="tr">
+      <span class="tl">&#x26A0;&#xFE0F; Simular Ovaliza&ccedil;&atilde;o/Erro</span>
+      <label class="sw"><input type="checkbox" id="t-wob" onchange="setWob(this.checked)"><div class="sw-t"></div><div class="sw-k"></div></label>
+    </div>
+    <div class="tr">
+      <span class="tl">&#x1F3F7;&#xFE0F; Marcadores T&eacute;cnicos</span>
+      <label class="sw"><input type="checkbox" id="t-lb" onchange="setLbls(this.checked)"><div class="sw-t"></div><div class="sw-k"></div></label>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="slbl">&#x1F4CA; Telemetria</div>
+    <div class="live"><span class="dot"></span>LIVE</div>
+    <div class="ti">
+      <div class="tk">Azimute da C&uacute;pula</div>
+      <div class="tv" id="v-az">0.00 <span class="tu">&deg;</span></div>
+    </div>
+    <div class="ti">
+      <div class="tk">Pulsos Encoder (x4)</div>
+      <div class="tv" id="v-p" style="font-size:16px">0 <span class="tu">pulsos</span></div>
+    </div>
+    <div class="ti">
+      <div class="tk">Resolu&ccedil;&atilde;o Angular</div>
+      <div class="tv" style="color:#38bdf8;font-size:14px">0.0029 <span class="tu">&deg; / 0.175'</span></div>
+    </div>
+    <div class="inf">
+      R/r = 1500/50 = <span>30</span> &middot; PPR&times;4&times;30 = <b>122.880</b><br>
+      &delta;&theta; = 360 &divide; 122880 = <span>0.0029&deg;</span>
+    </div>
+  </div>
+</div>
+<div id="lbls">
+  <div class="lbl"   id="L0">&#x1F7E2; Roda SRMIE + Encoder</div>
+  <div class="lbl lbl-o" id="L1">&#x1F7E0; Mola Pantogr&aacute;fica</div>
+  <div class="lbl lbl-r" id="L2">&#x1F534; Motor de Tra&ccedil;&atilde;o</div>
+  <div class="lbl"   id="L3">&#x2B21; Trilho Guia (Anel)</div>
+  <div class="lbl lbl-r" id="L-old" style="font-weight:bold;">&#x26A0; Leitor Fixo</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+'use strict';
+// ===== CONSTANTS =============================================================
+var DR=1.5, WR=0.05, TWR=0.085, RATIO=30, PPR=1024, TOTAL=PPR*4*RATIO;
+var OMEGA=0.22, WALL_H=0.85, SLIT_H=0.13, DOOR_OPEN=Math.PI/5.5;
+var APX=-(DR-0.205), APY=0.05, ALEN=0.152, WXNOM=APX-ALEN;
+var MANG=Math.PI*5/6, SPRNOM=0.15, SPRCOILS=8, SPRR=0.013;
+
+// Spring pre-alloc
+var sprA=new THREE.Vector3(APX+0.105, WALL_H+APY, 0);
+var sprB=new THREE.Vector3();
+var _za=new THREE.Vector3(0,0,1), _sq=new THREE.Quaternion(), _sd=new THREE.Vector3();
+function orientSpring(m,a,b){
+  _sd.copy(b).sub(a); var l=_sd.length();
+  if(l<0.001)return;
+  _sd.divideScalar(l); _sq.setFromUnitVectors(_za,_sd);
+  m.position.copy(a); m.quaternion.copy(_sq); m.scale.z=l/SPRNOM;
+}
+
+// ===== RENDERER ==============================================================
+var canvas=document.getElementById('c');
+var R=new THREE.WebGLRenderer({canvas:canvas,antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));
+R.shadowMap.enabled=true; R.shadowMap.type=THREE.PCFSoftShadowMap;
+R.toneMapping=THREE.ACESFilmicToneMapping; R.toneMappingExposure=0.88;
+R.setSize(innerWidth,innerHeight);
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(0x060914);
+scene.fog=new THREE.FogExp2(0x060914,0.072);
+
+// ===== CAMERA ================================================================
+var cam=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,0.01,60);
+cam.position.set(4.4,3.2,4.2);
+var ctrl=new THREE.OrbitControls(cam,R.domElement);
+ctrl.enableDamping=true; ctrl.dampingFactor=0.06;
+ctrl.minDistance=0.12; ctrl.maxDistance=15;
+ctrl.target.set(APX-0.02,WALL_H+APY,0); ctrl.update();
+
+// ===== LIGHTS ================================================================
+function dl(c,i,x,y,z,sh){
+  var l=new THREE.DirectionalLight(c,i); l.position.set(x,y,z);
+  if(sh){l.castShadow=true;l.shadow.mapSize.set(2048,2048);
+    l.shadow.camera.left=l.shadow.camera.bottom=-6;
+    l.shadow.camera.right=l.shadow.camera.top=6;
+    l.shadow.camera.near=0.5;l.shadow.camera.far=26;l.shadow.bias=-0.0004;}
+  scene.add(l); return l;
+}
+dl(0xfff2dc,2.9,5,11,5,true); dl(0x78b0e0,0.9,-6,4,-3,false); dl(0xc8d8f0,0.5,0,2,-8,false);
+scene.add(new THREE.AmbientLight(0x16233a,2.4));
+var upl=new THREE.PointLight(0x0a2818,2.0,5); upl.position.set(0,-0.2,0); scene.add(upl);
+
+// ===== HELPERS ===============================================================
+function M(c,mr,rn){return new THREE.MeshStandardMaterial({color:c,metalness:mr,roughness:rn});}
+function mk(geo,mat,sh){var m=new THREE.Mesh(geo,mat);if(sh){m.castShadow=true;m.receiveShadow=true;}return m;}
+
+// ===== FLOOR =================================================================
+var fm=M(0x14192a,0.08,0.88);
+var fA=mk(new THREE.CylinderGeometry(DR+0.80,DR+1.0,0.20,64),fm,true); fA.position.y=-0.10; scene.add(fA);
+var fB=mk(new THREE.CylinderGeometry(DR+1.05,DR+1.28,0.09,64),fm,true); fB.position.y=-0.205; scene.add(fB);
+
+// ===== WALL ==================================================================
+var wR2=DR+0.065;
+var wO=mk(new THREE.CylinderGeometry(wR2,wR2+0.04,WALL_H,80,1,true),M(0xcfd8e2,0.06,0.72),true);
+wO.position.y=WALL_H/2; scene.add(wO);
+var wI=mk(new THREE.CylinderGeometry(wR2-0.08,wR2,WALL_H,80,1,true),new THREE.MeshStandardMaterial({color:0xb6c0cc,roughness:.78,metalness:.03,side:THREE.BackSide}),false);
+wI.position.y=WALL_H/2; scene.add(wI);
+var wC=mk(new THREE.RingGeometry(wR2-0.08,wR2+0.04,80),M(0xc0cad4,0.10,0.65),false);
+wC.rotation.x=-Math.PI/2; wC.position.y=WALL_H; scene.add(wC);
+
+// ===== GUIDE RAIL ============================================================
+var rM=mk(new THREE.TorusGeometry(DR,0.030,22,180),new THREE.MeshStandardMaterial({color:0xd4a010,metalness:.90,roughness:.16,emissive:0x281600,emissiveIntensity:.35}),true);
+rM.rotation.x=Math.PI/2; rM.position.y=WALL_H+0.006; scene.add(rM);
+
+// ===== DOME GROUP (rotates) ==================================================
+var dG=new THREE.Group(); dG.position.y=WALL_H; scene.add(dG);
+var domeMat=new THREE.MeshStandardMaterial({color:0xccd4de,roughness:.40,metalness:.14});
+var domeSM=mk(new THREE.SphereGeometry(DR,80,40,SLIT_H,2*Math.PI-2*SLIT_H,0,Math.PI/2),domeMat,true);
+dG.add(domeSM);
+var skirtM=mk(new THREE.CylinderGeometry(DR,DR+0.026,0.10,72),M(0xb8c2ce,0.22,0.50),true);
+skirtM.position.y=-0.05; dG.add(skirtM);
+
+// Slit frame arcs
+var beamMat=M(0x708090,0.72,0.28);
+function makeSitArc(phi){
+  var pts=[]; for(var i=0;i<=38;i++){var t=(i/38)*(Math.PI/2);
+    pts.push(new THREE.Vector3(Math.sin(t)*Math.cos(phi)*DR,Math.cos(t)*DR,Math.sin(t)*Math.sin(phi)*DR));}
+  return mk(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),38,0.024,8,false),beamMat,true);
+}
+dG.add(makeSitArc(SLIT_H)); dG.add(makeSitArc(-SLIT_H));
+var cBr=mk(new THREE.CylinderGeometry(0.016,0.016,2*DR*Math.sin(SLIT_H)*1.1,8),beamMat,true);
+cBr.rotation.z=Math.PI/2; cBr.position.y=Math.cos(Math.PI/4)*DR; dG.add(cBr);
+var btR=mk(new THREE.CylinderGeometry(0.013,0.013,2*DR*Math.sin(SLIT_H)*1.05,8),beamMat,true);
+btR.rotation.z=Math.PI/2; btR.position.y=0.012; dG.add(btR);
+
+// ===== SHUTTER DOORS =========================================================
+var DDR=DR-0.007;
+var dMatR=new THREE.MeshStandardMaterial({color:0xaabac8,metalness:.30,roughness:.55,side:THREE.DoubleSide});
+var dMatL=new THREE.MeshStandardMaterial({color:0xaabac8,metalness:.30,roughness:.55,side:THREE.DoubleSide});
+var ribMat=M(0x8898a8,0.60,0.40);
+function addRibs(grp,ps,pl){
+  for(var ri=0;ri<3;ri++){var phi=ps+pl*(ri+0.5)/3;
+    var rp=[]; for(var j=0;j<=20;j++){var t=(j/20)*(Math.PI/2);
+      rp.push(new THREE.Vector3(Math.sin(t)*Math.cos(phi)*(DDR+0.004),Math.cos(t)*(DDR+0.004),Math.sin(t)*Math.sin(phi)*(DDR+0.004)));}
+    grp.add(mk(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rp),20,0.008,6,false),ribMat,false));}
+}
+var doorRMesh=mk(new THREE.SphereGeometry(DDR,14,24,0,SLIT_H,0,Math.PI/2),dMatR,false);
+var doorRGrp=new THREE.Group(); doorRGrp.add(doorRMesh); addRibs(doorRGrp,0,SLIT_H); dG.add(doorRGrp);
+var doorLMesh=mk(new THREE.SphereGeometry(DDR,14,24,2*Math.PI-SLIT_H,SLIT_H,0,Math.PI/2),dMatL,false);
+var doorLGrp=new THREE.Group(); doorLGrp.add(doorLMesh); addRibs(doorLGrp,2*Math.PI-SLIT_H,SLIT_H); dG.add(doorLGrp);
+
+// ===== SRMIE MECHANISM =======================================================
+var SR=new THREE.Group(); SR.position.y=WALL_H; scene.add(SR);
+// Mounting plate
+var plM=mk(new THREE.BoxGeometry(0.12,0.19,0.022),M(0x4a5e6e,0.65,0.36),true);
+plM.position.set(APX-0.01,0.08,0); plM.rotation.y=Math.PI/2; SR.add(plM);
+// Bolts
+[[-0.04,-0.05],[0.04,-0.05],[-0.04,0.05],[0.04,0.05]].forEach(function(d){
+  var b=mk(new THREE.CylinderGeometry(0.004,0.004,0.013,6),M(0xb0c4d4,0.92,0.16),false);
+  b.rotation.z=Math.PI/2; b.position.set(APX-0.002,d[0]+0.08,d[1]); SR.add(b);
+});
+// Bracket legs
+[-0.024,0.024].forEach(function(dz){
+  var leg=mk(new THREE.BoxGeometry(ALEN*0.58,0.013,0.010),M(0x607080,0.62,0.38),true);
+  leg.position.set(APX-ALEN*0.29,APY,dz); SR.add(leg);
+});
+var xMem=mk(new THREE.BoxGeometry(0.010,0.013,0.06),M(0x607080,0.62,0.38),false);
+xMem.position.set(APX-ALEN*0.55,APY,0); SR.add(xMem);
+// Pivot block & pin
+var pivB=mk(new THREE.BoxGeometry(0.050,0.052,0.044),M(0x6a7e90,0.72,0.30),true);
+pivB.position.set(APX,APY,0); SR.add(pivB);
+var pivP=mk(new THREE.CylinderGeometry(0.0044,0.0044,0.068,8),M(0xd0dce8,0.94,0.14),false);
+pivP.position.set(APX,APY,0); SR.add(pivP);
+
+// ===== ARM GROUP (pivots at APX,APY) =========================================
+var armG=new THREE.Group(); armG.position.set(APX,APY,0); SR.add(armG);
+// Main arm bar
+var armBar=mk(new THREE.BoxGeometry(ALEN,0.016,0.016),M(0x98b0bc,0.68,0.32),true);
+armBar.position.x=-ALEN/2; armG.add(armBar);
+// Diagonal strut
+var stLen=ALEN*0.55;
+var strut=mk(new THREE.BoxGeometry(stLen,0.009,0.009),M(0x7a9298,0.65,0.35),true);
+strut.position.set(-stLen/2-0.01,-0.008,0.005); strut.rotation.z=0.05; armG.add(strut);
+// Arm end block
+var endB=mk(new THREE.BoxGeometry(0.028,0.038,0.036),M(0x6080a0,0.70,0.32),true);
+endB.position.x=-ALEN; armG.add(endB);
+
+// ===== WHEEL GROUP ===========================================================
+var wheelG=new THREE.Group(); wheelG.position.x=-ALEN; armG.add(wheelG);
+var axleM=mk(new THREE.CylinderGeometry(0.006,0.006,0.058,12),M(0xc8d8e4,0.93,0.14),false);
+axleM.rotation.z=Math.PI/2; wheelG.add(axleM);
+var hubM=mk(new THREE.CylinderGeometry(WR*0.56,WR*0.56,0.028,20),M(0xaabccc,0.80,0.24),true);
+hubM.rotation.z=Math.PI/2; wheelG.add(hubM);
+for(var si=0;si<5;si++){
+  var sang=si*Math.PI*2/5;
+  var spk=mk(new THREE.BoxGeometry(WR*1.05,0.006,0.006),M(0x8aa0b0,0.76,0.30),false);
+  spk.rotation.x=sang; wheelG.add(spk);
+}
+var treadM=mk(new THREE.CylinderGeometry(WR+0.003,WR+0.003,0.026,36),M(0x050505,0.0,0.98),true);
+treadM.rotation.z=Math.PI/2; wheelG.add(treadM);
+[-0.010,0.010].forEach(function(dx){
+  var gr=mk(new THREE.TorusGeometry(WR+0.003,0.0022,6,36),M(0x070e06,0.0,0.96),false);
+  gr.rotation.y=Math.PI/2; gr.position.x=dx; wheelG.add(gr);
+});
+
+// ===== ENCODER (NOT child of wheelG — doesn't spin with wheel) ===============
+var encBody=mk(new THREE.CylinderGeometry(0.026,0.026,0.040,24),
+  new THREE.MeshStandardMaterial({color:0xdb6d28,metalness:.6,roughness:.4,emissive:0x552200,emissiveIntensity:0.5}),true);
+encBody.rotation.z=Math.PI/2; encBody.position.set(-ALEN-0.036,0,0); armG.add(encBody);
+var encFace=mk(new THREE.CircleGeometry(0.018,20),
+  new THREE.MeshStandardMaterial({color:0x38bdf8,emissive:0x0060b0,emissiveIntensity:2.2,roughness:.3}),false);
+encFace.rotation.y=Math.PI/2; encFace.position.set(-ALEN-0.060,0,0); armG.add(encFace);
+var encRing=mk(new THREE.TorusGeometry(0.022,0.003,8,22),M(0x2a4a60,0.70,0.30),false);
+encRing.rotation.y=Math.PI/2; encRing.position.set(-ALEN-0.030,0,0); armG.add(encRing);
+var conStub=mk(new THREE.BoxGeometry(0.012,0.018,0.018),M(0x08141e,0.50,0.68),false);
+conStub.position.set(-ALEN-0.042,-0.030,0); armG.add(conStub);
+// Cable
+var cblPts=[new THREE.Vector3(-ALEN-0.048,-0.015,0),new THREE.Vector3(-ALEN+0.010,0.045,0),
+  new THREE.Vector3(-ALEN+0.060,0.062,0.008),new THREE.Vector3(-0.005,0.060,0)];
+armG.add(mk(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cblPts),24,0.003,6,false),M(0x060606,0.0,0.95),false));
+
+// ===== SPRING (dynamic, scene-level) =========================================
+var sprPts=[];
+for(var ki=0;ki<=SPRCOILS*18;ki++){
+  var kt=ki/(SPRCOILS*18), kang=kt*SPRCOILS*2*Math.PI;
+  sprPts.push(new THREE.Vector3(Math.cos(kang)*SPRR,Math.sin(kang)*SPRR,kt*SPRNOM));
+}
+var sprMesh=mk(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(sprPts),SPRCOILS*18,0.004,8,false),
+  new THREE.MeshStandardMaterial({color:0xf08030,metalness:.52,roughness:.40,emissive:0x1c0800,emissiveIntensity:.45}),true);
+scene.add(sprMesh);
+var capMat2=M(0x904010,0.62,0.44);
+var sprCapA=mk(new THREE.SphereGeometry(0.012,8,8),capMat2,false); scene.add(sprCapA);
+var sprCapB=mk(new THREE.SphereGeometry(0.012,8,8),capMat2,false); scene.add(sprCapB);
+// Contact glow
+var glowM=mk(new THREE.SphereGeometry(0.009,8,8),
+  new THREE.MeshStandardMaterial({color:0x00ff80,emissive:0x00ff60,emissiveIntensity:3.0}),false);
+scene.add(glowM);
+
+// ===== MOTOR ASSEMBLY ========================================================
+var motorG=new THREE.Group(); motorG.position.y=WALL_H; motorG.rotation.y=MANG; scene.add(motorG);
+var mpM=mk(new THREE.BoxGeometry(0.15,0.24,0.022),M(0x3c1616,0.62,0.44),true);
+mpM.position.set(-(DR-0.21),0.10,0); mpM.rotation.y=Math.PI/2; motorG.add(mpM);
+var gbM=mk(new THREE.BoxGeometry(0.13,0.13,0.11),M(0x6a1e1e,0.55,0.52),true);
+gbM.position.set(-(DR-0.165),0.07,0); motorG.add(gbM);
+for(var fi=-2;fi<=2;fi++){
+  var fn=mk(new THREE.BoxGeometry(0.004,0.10,0.10),M(0x581616,0.52,0.56),false);
+  fn.position.set(-(DR-0.165)-0.070,0.07,fi*0.018); motorG.add(fn);
+}
+var mTube=mk(new THREE.CylinderGeometry(0.042,0.042,0.16,18),M(0x862424,0.62,0.40),true);
+mTube.rotation.z=Math.PI/2; mTube.position.set(-(DR-0.305),0.07,0); motorG.add(mTube);
+var mCap=mk(new THREE.CylinderGeometry(0.043,0.043,0.010,18),M(0x541414,0.72,0.32),false);
+mCap.rotation.z=Math.PI/2; mCap.position.set(-(DR-0.390),0.07,0); motorG.add(mCap);
+// Traction wheel
+var tWG=new THREE.Group(); tWG.position.set(-(DR-TWR-0.003),0.05,0); motorG.add(tWG);
+var tHub=mk(new THREE.CylinderGeometry(TWR*0.62,TWR*0.62,0.042,20),M(0x502020,0.52,0.62),true);
+tHub.rotation.z=Math.PI/2; tWG.add(tHub);
+for(var ts=0;ts<4;ts++){
+  var tspk=mk(new THREE.BoxGeometry(TWR*1.1,0.010,0.012),M(0x481818,0.54,0.60),false);
+  tspk.rotation.x=ts*Math.PI/2; tWG.add(tspk);
+}
+var tTrd=mk(new THREE.CylinderGeometry(TWR+0.005,TWR+0.005,0.046,30),M(0x0c0c0c,0.0,0.94),true);
+tTrd.rotation.z=Math.PI/2; tWG.add(tTrd);
+for(var tl=0;tl<10;tl++){
+  var tlang=tl*Math.PI*2/10;
+  var lug=mk(new THREE.BoxGeometry(0.007,0.016,0.040),M(0x080808,0.0,0.97),false);
+  lug.position.set(Math.cos(tlang)*TWR*0.92,Math.sin(tlang)*TWR*0.92,0);
+  lug.rotation.x=tlang+Math.PI/2; tWG.add(lug);
+}
+var mGlow=mk(new THREE.SphereGeometry(0.009,8,8),
+  new THREE.MeshStandardMaterial({color:0xff2828,emissive:0xff1010,emissiveIntensity:2.5}),false);
+mGlow.position.set(-(DR+0.004),APY,0); motorG.add(mGlow);
+
+// ===== OLD SYSTEM (FIXED TAPE READER) ========================================
+var oldReaderG = new THREE.Group();
+oldReaderG.position.set(-DR, WALL_H + 0.05, 0.4);
+scene.add(oldReaderG);
+var oldReader = mk(new THREE.BoxGeometry(0.05, 0.08, 0.06), new THREE.MeshStandardMaterial({color:0xff2222, transparent:true, opacity:0.6, emissive:0xaa0000, emissiveIntensity:0.5}), false);
+oldReaderG.add(oldReader);
+var oldBeam = mk(new THREE.CylinderGeometry(0.004, 0.004, 0.04), new THREE.MeshBasicMaterial({color:0xff0000, transparent:true, opacity:0.8}), false);
+oldBeam.rotation.z = Math.PI/2;
+oldBeam.position.set(0.025, 0, 0);
+oldReaderG.add(oldBeam);
+
+// ===== STATE =================================================================
+var rotDir=1,labelsOn=false,doorTarget=0,doorAng=0;
+var domeAng=0,oscPhase=0,oscVal=0,inspMode=false;
+var wobbleOn=false, wobbleAmt=0;
+var camTP=null,camTL=null;
+var wfMeshes=[domeSM,skirtM,doorRMesh,doorLMesh,oldReader];
+
+// ===== CAMERA PRESETS ========================================================
+var CAMS={
+  ov:{p:new THREE.Vector3(4.4,3.2,4.2),  l:new THREE.Vector3(0,0.9,0)},
+  sr:{p:new THREE.Vector3(-(DR-0.11),0.26,0.62), l:new THREE.Vector3(WXNOM,WALL_H+0.05,0)},
+  mo:{p:new THREE.Vector3(Math.cos(MANG+0.45)*(DR+0.30),WALL_H+0.55,Math.sin(MANG+0.45)*(DR+0.30)+0.85),
+      l:new THREE.Vector3(Math.cos(MANG)*(DR-0.14),WALL_H+0.08,Math.sin(MANG)*(DR-0.14))},
+  ma:{p:new THREE.Vector3(APX+0.12,WALL_H+APY+0.08,0.15), l:new THREE.Vector3(APX-0.02,WALL_H+APY,0)},
+  po:{p:new THREE.Vector3(-DR+0.08,WALL_H+APY+0.015,-0.15), l:new THREE.Vector3(-DR,WALL_H+APY,0.05)}
+};
+var activeCamMode = 'ma';
+setCam('ma');
+function setCam(k){
+  activeCamMode = k;
+  if(CAMS[k]){ camTP=CAMS[k].p.clone(); camTL=CAMS[k].l.clone(); }
+  document.querySelectorAll('.cb').forEach(function(b){b.classList.remove('on');});
+  document.getElementById('b-'+k).classList.add('on');
+  inspMode=(k!=='ov' && k!=='mo'); applyInspect();
+}
+function applyInspect(){
+  var op=inspMode?0.20:1.0;
+  [domeSM,skirtM].forEach(function(m){
+    m.material.transparent=inspMode; m.material.opacity=op; m.material.depthWrite=!inspMode;
+  });
+}
+
+// ===== TOGGLES ===============================================================
+function setWire(v){wfMeshes.forEach(function(m){m.material.wireframe=v;m.material.transparent=v||inspMode;m.material.opacity=v?0.5:(inspMode?0.20:1.0);}); oldReader.material.opacity=v?0.3:0.6;}
+function setDir(v){rotDir=parseInt(v);}
+function setDoor(v){doorTarget=v?1:0;}
+function setWob(v){wobbleOn=v;}
+function setLbls(v){labelsOn=v;['L0','L1','L2','L3','L-old'].forEach(function(id){document.getElementById(id).style.display=v?'block':'none';});}
+
+// ===== LABELS ================================================================
+var lblW={
+  L0:new THREE.Vector3(WXNOM,WALL_H+0.19,0),
+  L1:new THREE.Vector3(APX+0.06,WALL_H+APY+0.12,0),
+  L2:new THREE.Vector3(-Math.cos(MANG)*(DR-0.20),WALL_H+0.25,Math.sin(MANG)*(DR-0.20)),
+  L3:new THREE.Vector3(DR*0.72,WALL_H+0.07,DR*0.72),
+  'L-old':new THREE.Vector3(-DR,WALL_H+0.18,0.4)
+};
+function projPt(wp){var v=wp.clone().project(cam);return{x:(v.x*.5+.5)*innerWidth,y:(1-(v.y*.5+.5))*innerHeight};}
+function updateLabels(){if(!labelsOn)return;for(var id in lblW){var s=projPt(lblW[id]);var el=document.getElementById(id);el.style.left=s.x+'px';el.style.top=s.y+'px';}}
+
+// ===== TELEMETRY =============================================================
+function updateTel(){
+  var az=((domeAng*180/Math.PI)%360+360)%360;
+  var p=Math.round(az/360*TOTAL);
+  document.getElementById('v-az').innerHTML=az.toFixed(2)+' <span class="tu">&deg;</span>';
+  document.getElementById('v-p').innerHTML=p.toLocaleString('pt-BR')+' <span class="tu">pulsos</span>';
+}
+
+// ===== ANIMATION =============================================================
+var clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  var dt=Math.min(clock.getDelta(),0.05), t=clock.getElapsedTime();
+
+  // Door lerp
+  doorAng+=(doorTarget-doorAng)*8*dt;
+  doorRGrp.rotation.y=doorAng*DOOR_OPEN;
+  doorLGrp.rotation.y=-doorAng*DOOR_OPEN;
+
+  // Wobble simulation
+  wobbleAmt += ((wobbleOn ? 0.040 : 0) - wobbleAmt) * 4 * dt;
+  var wobX = Math.cos(domeAng * 2.5) * wobbleAmt;
+  var wobZ = Math.sin(domeAng * 2.5) * wobbleAmt;
+  dG.position.x = wobX; dG.position.z = wobZ;
+  rM.position.x = wobX; rM.position.z = wobZ;
+
+  // Rotation
+  if(rotDir !== 0){
+    var dd = rotDir * OMEGA * dt; domeAng += dd; dG.rotation.y += dd;
+    wheelG.rotation.x += dd * RATIO; treadM.rotation.x += dd * RATIO;
+    tWG.rotation.x += dd * (DR / TWR);
+    oscPhase += dt * 3.8 * 2 * Math.PI;
+    
+    // Absorbing wobble with the pantograph arm
+    // Absorbing wobble with the pantograph arm - EXACT MATH
+    // Distance from Pivot to Rail Center:
+    var dx = wobX - APX;
+    var dz = wobZ - 0;
+    var d = Math.sqrt(dx*dx + dz*dz);
+    var r1 = ALEN;
+    var r2 = DR + WR;
+    var targetOsc = oscVal; // Default to current
+    if(d <= r1 + r2 && d >= Math.abs(r1 - r2)) {
+      var a = (r1*r1 - r2*r2 + d*d) / (2*d);
+      var h = Math.sqrt(r1*r1 - a*a);
+      var px2 = APX + a * (dx/d);
+      var pz2 = 0 + a * (dz/d);
+      // We want the solution pointing towards the dome (-X direction)
+      var ix = px2 - h * (dz/d);
+      var iz = pz2 + h * (dx/d);
+      targetOsc = Math.atan2(iz, ix - APX);
+    }
+    
+    // Add micro-vibration
+    oscVal = targetOsc + Math.sin(oscPhase) * 0.003;
+    encBody.material.emissiveIntensity = 0.5 + 0.4 * Math.abs(Math.sin(t * 16));
+  } else {
+    var targetOsc = Math.asin(Math.max(-1, Math.min(1, wobX / (ALEN * 0.9))));
+    oscVal += (targetOsc - oscVal) * 4 * dt;
+  }
+  armG.rotation.y = oscVal;
+
+  // Update Old Reader Status
+  var oldMsg = '&#x26A0; Leitor Fixo';
+  var oldEl = document.getElementById('L-old');
+  if (wobbleAmt > 0.01) {
+    if (wobX > 0.01) {
+      oldMsg = '&#x26A0; Sinal Perdido - Gap excessivo';
+      oldReader.material.emissive.setHex(0xff8800);
+    } else if (wobX < -0.01) {
+      oldMsg = '&#x1F4A5; Colis&atilde;o Mec&acirc;nica!';
+      oldReader.material.emissive.setHex(0xff0000);
+    }
+  } else {
+    oldReader.material.emissive.setHex(0xaa0000);
+  }
+  if (oldEl.innerHTML !== oldMsg) oldEl.innerHTML = oldMsg;
+
+  // Spring dynamic
+  var sbx = APX + (-ALEN * 0.50) * Math.cos(oscVal);
+  var sbz = ALEN * 0.50 * Math.sin(oscVal);
+  sprB.set(sbx, WALL_H + APY, sbz);
+  orientSpring(sprMesh, sprA, sprB);
+  sprCapA.position.copy(sprA); sprCapB.position.copy(sprB);
+
+  // Contact glow
+  var gwx = APX + (-ALEN) * Math.cos(oscVal), gwz = ALEN * Math.sin(oscVal);
+  var gwr = Math.sqrt(gwx * gwx + gwz * gwz), gsc = (DR + 0.004) / gwr;
+  glowM.position.set(gwx * gsc, WALL_H + APY, gwz * gsc);
+  if(rotDir !== 0){
+    glowM.material.emissiveIntensity = 2.0 + 1.5 * Math.abs(Math.sin(t * 15));
+    mGlow.material.emissiveIntensity = 1.4 + 0.9 * Math.abs(Math.sin(t * 10 + 1.2));
+  }
+
+  // Dynamic Camera tracking
+  if(activeCamMode === 'dy'){
+    var wy = WALL_H + APY;
+    camTL = new THREE.Vector3(gwx, wy, gwz);
+    // Camera looks from slightly inside and behind, towards the wheel and old reader
+    camTP = new THREE.Vector3(APX + 0.18, wy + 0.08, -0.22);
+  }
+
+  // Camera lerp
+  if(camTP){
+    cam.position.lerp(camTP,0.055);
+    ctrl.target.lerp(camTL,0.055);
+    if(activeCamMode !== 'dy' && cam.position.distanceTo(camTP)<0.003) camTP=null;
+  }
+
+  ctrl.update(); updateLabels(); updateTel(); R.render(scene,cam);
+}
+window.addEventListener('resize',function(){cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight);});
+animate();
+</script>
+</body>
+</html>
