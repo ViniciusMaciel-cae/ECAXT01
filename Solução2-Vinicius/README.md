@@ -50,17 +50,16 @@ $$\text{Azimute (º)} = \left( \frac{\text{Contagem Atual do Encoder}}{\text{Res
 
 ## 3. Quadro Comparativo das Soluções
 
-| Parâmetro / Característica | Solução 1: Caixa 1:1 + Encoder Singleturn | Solução 2: Direto/Multivoltas + Pinhão Leitor |
+| Parâmetro / Característica | Solução : Direto/Multivoltas + Pinhão Leitor |
 | :--- | :--- | :--- |
-| **Relação Mecânica Total ($R_t$)** | $1 : 1$ (1 volta encoder = 1 volta cúpula) | $R_t \gg 1$ (várias voltas por volta da cúpula) |
-| **Tipo de Encoder Requerido** | Absoluto Singleturn | Absoluto Multivoltas |
-| **Fonte da Resolução Angular** | Exclusivamente do encoder | Multiplicação mecânica ($N_{\text{encoder}} \times R_t$) |
-| **Precisão Angular Típica (Ex. 12 bits)** | $\approx 0,0878^\circ \ (5,26')$ [Baixa] | $\approx 0,00146^\circ \ (5,27'')$ [Alta] |
-| **Impacto do Backlash (Folga)** | Alto (amplificado pelas engrenagens) | Baixo (acoplamento direto no pinhão) |
-| **Complexidade Mecânica** | Elevada (caixa de redução extra) | Baixa (acoplamento direto) |
-| **Complexidade de Software/PLC** | Muito Baixa (direta $0-360^\circ$) | Média (mapeamento de voltas do pinhão) |
-| **Recomendação de Aplicação** | Sistemas didáticos ou de baixa precisão | Observatórios astronômicos de alta precisão |
-| **Custo**|Médio / Elevado: Embora o encoder singleturn seja mais barato individualmente, o custo mecânico global aumenta (caixa de engrenagens customizada, usinagem e manutenção contínua) | Baixo / Moderado: O sensor (multivoltas) tem um custo individual um pouco maior, mas o custo total do sistema é significativamente menor devido à extrema simplicidade mecânica |
+| **Relação Mecânica Total ($R_t$)** | $R_t \gg 1$ (várias voltas por volta da cúpula) |
+| **Tipo de Encoder Requerido**  | Absoluto Multivoltas |
+| **Fonte da Resolução Angular**  | Multiplicação mecânica ($N_{\text{encoder}} \times R_t$) |
+| **Precisão Angular Típica (Ex. 12 bits)**  | $\approx 0,00146^\circ \ (5,27'')$ [Alta] |
+| **Impacto do Backlash (Folga)** | Baixo (acoplamento direto no pinhão) |
+| **Complexidade Mecânica** | Baixa (acoplamento direto) |
+| **Complexidade de Software/PLC** | Média (mapeamento de voltas do pinhão) |
+| **Recomendação de Aplicação**  | Observatórios astronômicos de alta precisão |
 
 ---
 
