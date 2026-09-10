@@ -1,318 +1,905 @@
-# Análise Comparativa de Sistemas de Medição de Posição Azimutal para Cúpulas Astronômicas
+# Solução de Medição Angular para Cúpula de Telescópio
 
-Captura Mecânica: Uma cremalheira circular fixada na base da cúpula engrena em um pinhão leitor fixo na estrutura imóvel do observatório. O engrenamento direto elimina o deslizamento (slip), garantindo repetibilidade contínua.
-Conversão Angular: O giro da cúpula aciona o pinhão, que transmite a rotação ao eixo de um encoder absoluto.
-Processamento: O encoder gera uma palavra digital contendo a posição angular exata. O controlador (PLC) lê essa contagem, aplica a relação mecânica de transmissão e calcula o azimute em tempo real ($0^\circ \text{ a } 360^\circ$).
+## 1. Objetivo
 
-# Aprofundamento Técnico e Detalhamento das Abordagens
-Esta ideia geral pode ser implementada através de duas topologias distintas de acoplamento mecânico e codificação digital, cujos cálculos de resolução, relações de transmissão, equações e quadro comparativo estão documentados em detalhe no arquivo criado anteriormente:
+Esta solução foi desenvolvida para medir a posição angular de uma cúpula
+de telescópio de forma contínua, permitindo que o sistema de controle
+conheça a posição real da cúpula e utilize essa informação como
+**feedback de posição** em uma malha fechada.
 
----
+A proposta utiliza uma conversão **rotação → deslocamento linear →
+leitura eletrônica**, formada por:
 
-## 1. Solução 1: Mapeamento de 1 Volta do Encoder para 1 Volta da Cúpula
+-   pinhão;
+-   cremalheira associada ao movimento da cúpula;
+-   acoplamento de junta;
+-   encoder linear;
+-   bloco de guia linear;
+-   mecanismo de mola;
+-   base estrutural.
 
-Nesta arquitetura, utiliza-se um arranjo mecânico intermediário (caixa de engrenagens ou conjunto multiplicador/redutor) projetado para compensar exatamente a relação de transmissão da cremalheira e do pinhão. Dessa forma, uma rotação completa de 360° da cúpula astronômica resulta em exatamente uma rotação completa (360°) do eixo do encoder absoluto.
+> **Hipótese mecânica importante:** o desenho apresentado não mostra
+> explicitamente a cremalheira. Para que a solução funcione conforme
+> descrita, o pinhão deve engrenar em uma cremalheira solidária à cúpula
+> ou a um elemento que tenha deslocamento proporcional ao ângulo da
+> cúpula. Alternativamente, pode ser utilizada uma roda dentada/rolete
+> de medição em contato com uma pista. A interface pinhão--cremalheira
+> é, portanto, um requisito de projeto.
 
-### 1.1. Configuração e Relações Mecânicas
+------------------------------------------------------------------------
 
-Seja $R_{\text{crem}}$ a relação de transmissão entre a cremalheira circular da cúpula e o pinhão de acoplamento:
+## 2. Princípio de funcionamento
 
-$$R_{\text{crem}} = \frac{Z_{\text{cremalheira}}}{Z_{\text{pinhão}}} = \frac{D_{\text{cúpula}}}{D_{\text{pinhão}}}$$
+A cúpula gira em torno do seu eixo azimutal. Esse movimento angular é
+transmitido ao pinhão.
 
-Onde:
-* **$Z_{\text{cremalheira}}$ / $D_{\text{cúpula}}$:** Número total de dentes ou diâmetro primitivo da cúpula.
-* **$Z_{\text{pinhão}}$ / $D_{\text{pinhão}}$:** Número de dentes ou diâmetro primitivo do pinhão leitor.
+O pinhão engrena com uma cremalheira ou elemento equivalente. Quando a
+cúpula gira:
 
-Para obter uma relação total de transmissão $R_{t} = 1$, instala-se uma caixa de engrenagens entre o pinhão e o encoder com relação inversa:
+1.  o pinhão gira;
+2.  o contato entre pinhão e cremalheira transforma a rotação em
+    deslocamento linear;
+3.  esse deslocamento movimenta o carro associado ao encoder;
+4.  o encoder linear mede o deslocamento;
+5.  o sistema de controle converte o deslocamento linear medido em
+    ângulo;
+6.  o ângulo calculado é comparado com a posição desejada.
 
-$$R_{\text{redutor}} = \frac{1}{R_{\text{crem}}} = \frac{Z_{\text{pinhão}}}{Z_{\text{cremalheira}}}$$
+O princípio pode ser representado por:
 
-A relação total do sistema ($R_{t}$) é dada por:
+**Ângulo da cúpula → rotação do pinhão → deslocamento linear → encoder →
+posição angular**
 
-$$R_{t} = R_{\text{crem}} \times R_{\text{redutor}} = \left( \frac{Z_{\text{cremalheira}}}{Z_{\text{pinhão}}} \right) \times \left( \frac{Z_{\text{pinhão}}}{Z_{\text{cremalheira}}} \right) = 1$$
+Essa arquitetura permite instalar o sensor em uma região relativamente
+protegida e utilizar uma geometria mecânica simples para obter a posição
+angular.
 
-### 1.2. Equações para Cálculo de Resolução
+------------------------------------------------------------------------
 
-Com $R_{t} = 1$, a resolução angular na cúpula depende exclusivamente da resolução nativa do encoder *singleturn* de $B$ bits ($N_{\text{encoder}} = 2^B$ posições/volta):
+## 3. Equacionamento
 
-$$\text{Contagens Totais por Volta da Cúpula} = N_{\text{encoder}} \times R_{t} = 2^B \times 1 = 2^B$$
+Considerando um pinhão de módulo `m` e número de dentes `z`, seu
+diâmetro primitivo é:
 
-A menor variação angular detectável na cúpula ($\theta_{\text{mínimo}}$ em graus) é dada por:
-
-$$\theta_{\text{mínimo}} = \frac{360^\circ}{2^B}$$
-
-### 1.3. Vantagens
-
-* **Uso de Encoder Singleturn Simples:** Elimina a necessidade de hardware com contagem de voltas, utilizando apenas a faixa de $0^\circ$ a $360^\circ$ do sensor.
-* **Simplificação de Firmware/PLC:** A leitura digital do encoder mapeia diretamente o azimute da cúpula ($0^\circ \text{ a } 360^\circ$) sem necessidade de gerenciar estouro de contagem (*rollover*) de voltas no software do controlador.
-
-### 1.4. Desvantagens
-
-* **Perda Severa de Resolução Angular:** A precisão digital fica limitada aos bits do encoder. Por exemplo, com um encoder de 12 bits ($4096$ posições), a precisão é de $0,0878^\circ$ ($\approx 5,26'$ de arco), o que exige encoders industriais de custo elevado ($18 \text{ a } 20 \text{ bits}$) para alcançar precisão arcsegundar.
-* **Amplificação de Folga Mecânica (Backlash):** A adição da caixa de engrenagens intermediária insere folgas mecânicas que se somam diretamente à leitura do encoder, gerando zonas mortas no posicionamento.
-* **Maior Complexidade e Manutenção Mecânica:** O conjunto adicional de engrenagens aumenta o atrito, o ponto de falha e a necessidade de lubrificação/alinhamento mecânico.
-
----
-
-## 2. Solução 2: Acoplamento Direto com Encoder Absoluto Multivoltas
-
-Nesta abordagem — amplamente adotada em observatórios profissionais —, o encoder é acoplado diretamente ao eixo do pinhão leitor que engrena na cremalheira da cúpula, aproveitando a multiplicação mecânica natural do sistema sem caixas de redução intermediárias adicionais.
-
-### 2.1. Configuração e Relações Mecânicas
-
-A relação de transmissão total ($R_{t}$) é determinada diretamente pelo acoplamento cremalheira/pinhão (e um eventual redutor industrial padronizado, caso utilizado):
-
-$$R_{t} = R_{\text{crem}} \times R_{\text{redutor}} = \frac{Z_{\text{cremalheira}}}{Z_{\text{pinhão}}} \times R_{\text{redutor}}$$
-
-Como $Z_{\text{cremalheira}} \gg Z_{\text{pinhão}}$, o eixo do encoder realiza $R_{t}$ voltas completas para cada 1 volta da cúpula ($R_{t} \gg 1$).
-
-### 2.2. Equações para Cálculo de Resolução e Azimute
-
-Utilizando um encoder absoluto **multivoltas** com $B_{\text{single}}$ bits por volta (resolução angular) e $B_{\text{multi}}$ bits para contagem de voltas:
-
-$$\text{Contagens por Volta do Encoder} = 2^{B_{\text{single}}}$$
-
-$$\text{Contagens Totais por Volta da Cúpula} = 2^{B_{\text{single}}} \times R_{t}$$
-
-A menor variação angular detectável na cúpula ($\theta_{\text{mínimo}}$ em graus) passa a ser:
-
-$$\theta_{\text{mínimo}} = \frac{360^\circ}{2^{B_{\text{single}}} \times R_{t}}$$
-
-O cálculo do azimute real no controlador (PLC) é realizado aplicando a razão mecânica:
-
-$$\text{Azimute (º)} = \left( \frac{\text{Contagem Atual do Encoder}}{\text{Resolução por Volta}} \times 360^\circ \right) \times \frac{1}{R_{t}}$$
-
-### 2.3. Vantagens
-
-* **Alta Resolução Angular (Amplificação Mecânica):** A própria relação da cremalheira multiplica a resolução do encoder por $R_{t}$. Um encoder de 12 bits com $R_{t} = 60$ atinge $245.760$ posições em $360^\circ$, resultando em uma precisão de $\approx 5,27''$ (segundos de arco).
-* **Minimização de Folgas Mecânicas:** A ausência de caixas multiplicadoras intermediárias reduz drasticamente o *backlash* acumulado no sistema de leitura.
-* **Simplicidade e Robustez Mecânica:** Menor quantidade de componentes móveis, reduzindo pontos de falha e manutenção.
-* **Imunidade à Perda de Energia:** O encoder multivoltas retém a contagem exata de voltas e a posição angular do pinhão mesmo se desligado ou movimentado manualmente sem alimentação.
-
-### 2.4. Desvantagens
-
-* **Custo do Sensor:** Encoders absolutos multivoltas são mais caros do que modelos *singleturn* equivalentes.
-* **Lógica de Controle no Software:** Requer tratamento no software do PLC para conversão da escala de voltas do pinhão para o azimute de $0^\circ \text{ a } 360^\circ$ da cúpula.
-
----
-
-## 3. Quadro Comparativo das Soluções
-
-| Parâmetro / Característica | Solução 1: Caixa 1:1 + Encoder Singleturn | Solução 2: Direto/Multivoltas + Pinhão Leitor |
-| :--- | :--- | :--- |
-| **Relação Mecânica Total ($R_t$)** | $1 : 1$ (1 volta encoder = 1 volta cúpula) | $R_t \gg 1$ (várias voltas por volta da cúpula) |
-| **Tipo de Encoder Requerido** | Absoluto Singleturn | Absoluto Multivoltas |
-| **Fonte da Resolução Angular** | Exclusivamente do encoder | Multiplicação mecânica ($N_{\text{encoder}} \times R_t$) |
-| **Precisão Angular Típica (Ex. 12 bits)** | $\approx 0,0878^\circ \ (5,26')$ [Baixa] | $\approx 0,00146^\circ \ (5,27'')$ [Alta] |
-| **Impacto do Backlash (Folga)** | Alto (amplificado pelas engrenagens) | Baixo (acoplamento direto no pinhão) |
-| **Complexidade Mecânica** | Elevada (caixa de redução extra) | Baixa (acoplamento direto) |
-| **Complexidade de Software/PLC** | Muito Baixa (direta $0-360^\circ$) | Média (mapeamento de voltas do pinhão) |
-| **Recomendação de Aplicação** | Sistemas didáticos ou de baixa precisão | Observatórios astronômicos de alta precisão |
-| **Custo**|Médio / Elevado: Embora o encoder singleturn seja mais barato individualmente, o custo mecânico global aumenta (caixa de engrenagens customizada, usinagem e manutenção contínua) | Baixo / Moderado: O sensor (multivoltas) tem um custo individual um pouco maior, mas o custo total do sistema é significativamente menor devido à extrema simplicidade mecânica |
-
----
-
-**Conclusão:** Embora a Solução 1 ofereça simplicidade de programação, a **Solução 2 (Encoder Multivoltas acoplado ao pinhão leitor)** é o padrão de engenharia recomendado para observatórios astronômicos devido à extrema precisão angular proporcionada pela relação de transmissão mecânica e à eliminação de folgas mecânicas intermediárias.
-
----
-
-## 4. Especificações Técnicas do Sistema
-
-### 4.1. Parâmetros Mecânicos da Cúpula
-
-| Parâmetro | Valor Típico | Unidade |
-| :--- | :---: | :---: |
-| Diâmetro da cúpula astronômica | 2,0 – 10,0 | m |
-| Diâmetro primitivo da cremalheira circular | Igual ao da cúpula | m |
-| Módulo da cremalheira | 2 – 6 | mm |
-| Número de dentes da cremalheira ($Z_{\text{cremalheira}}$) | 400 – 5000 | dentes |
-| Diâmetro do pinhão leitor | 20 – 80 | mm |
-| Número de dentes do pinhão ($Z_{\text{pinhão}}$) | 10 – 40 | dentes |
-| Relação de transmissão natural ($R_{\text{crem}}$) | 30 – 300 | adimensional |
-
-### 4.2. Especificações do Encoder — Solução 1 (Singleturn)
-
-| Parâmetro | Especificação Mínima | Especificação Recomendada |
-| :--- | :---: | :---: |
-| Tipo | Absoluto Singleturn | Absoluto Singleturn |
-| Resolução (bits) | 12 bits (4 096 pos.) | 18 – 20 bits (262 144 – 1 048 576 pos.) |
-| Interface de comunicação | SSI / RS-422 | SSI / BiSS-C / EtherCAT |
-| Precisão angular no encoder | ≤ ±0,088° | ≤ ±0,001° |
-| Tensão de alimentação | 10 – 30 V CC | 24 V CC |
-| Proteção IP | IP54 | IP65 / IP67 |
-| Temperatura de operação | −10 °C a +70 °C | −40 °C a +85 °C |
-| Eixo / Flange | 6 mm / B10 | 10 mm / B10 ou cego |
-
-### 4.3. Especificações do Encoder — Solução 2 (Multivoltas)
-
-| Parâmetro | Especificação Mínima | Especificação Recomendada |
-| :--- | :---: | :---: |
-| Tipo | Absoluto Multivoltas | Absoluto Multivoltas |
-| Resolução singleturn (bits) | 12 bits (4 096 pos./volta) | 16 – 17 bits (65 536 – 131 072 pos./volta) |
-| Capacidade multivoltas (bits) | 12 bits (4 096 voltas) | 16 bits (65 536 voltas) |
-| Interface de comunicação | SSI / Profibus | SSI / BiSS-C / EtherCAT / PROFINET |
-| Resolução efetiva na cúpula (ex. $R_t = 60$, 12 bits) | ≈ 5,27″ | < 0,1″ |
-| Tensão de alimentação | 10 – 30 V CC | 24 V CC |
-| Proteção IP | IP64 | IP67 |
-| Temperatura de operação | −10 °C a +70 °C | −40 °C a +85 °C |
-| Retenção de posição sem energia | Sim (Wiegand / bateria) | Sim (Wiegand sem bateria) |
-
-### 4.4. Especificações do Controlador (PLC/Microcontrolador)
-
-| Parâmetro | Requisito |
-| :--- | :--- |
-| Entradas digitais SSI | Mínimo 1 canal SSI de alta resolução |
-| Frequência de aquisição | ≥ 100 Hz (para rastreamento em tempo real) |
-| Resolução da variável de processo | 32 bits inteiros com sinal |
-| Comunicação superior | Ethernet / ModBus TCP / PROFINET / ASCOM |
-| Saída de controle | PWM / Analógico (para motor de rotação da cúpula) |
-
----
-
-## 5. Detalhamento de Instalação
-
-### 5.1. Visão Geral do Processo de Instalação
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  FLUXO DE INSTALAÇÃO DO SISTEMA DE MEDIÇÃO AZIMUTAL                    │
-│                                                                          │
-│  [1] Preparação    → [2] Montagem     → [3] Cabeamento  → [4] Config.  │
-│      Mecânica           do Encoder         e Proteção        e Teste    │
-└─────────────────────────────────────────────────────────────────────────┘
+``` text
+d = m · z
 ```
 
-### 5.2. Etapa 1 — Preparação Mecânica
+O deslocamento linear correspondente a uma volta do pinhão é:
 
-1. **Verificação da cremalheira circular:** Inspecionar desgaste, módulo e concentricidade. Substituir segmentos desgastados antes da instalação do encoder.
-2. **Seleção e usinagem do pinhão leitor:** Fabricar ou selecionar o pinhão com módulo compatível com a cremalheira. O diâmetro deve ser calculado para obter a relação $R_{\text{crem}}$ desejada.
-3. **Fabricação do suporte (bracket):** Confeccionar em aço inox ou alumínio anodizado um suporte rígido para o encoder e o pinhão, fixado à estrutura imóvel do observatório. O suporte deve permitir ajuste de folga (backlash) pelo deslocamento radial do conjunto.
-4. **Verificação de folga de engrenamento:** Ajustar a distância entre centros pinhão/cremalheira para obter folga mínima sem travamento. Folga recomendada: **0,1 × módulo**.
+``` text
+L = π · d
+```
 
-### 5.3. Etapa 2 — Montagem do Encoder
+Para um ângulo `θ` em graus:
 
-1. **Acoplamento ao eixo do pinhão (Solução 2):** Utilizar acoplamento flexível de fole metálico ou disco flexível para compensar desalinhamentos angulares (≤ 1°) e axiais (≤ 0,5 mm), preservando a precisão e evitando cargas radiais excessivas no eixo do encoder.
-2. **Acoplamento com caixa de redução (Solução 1):** Montar a caixa de redução entre o pinhão e o encoder, garantindo alinhamento coaxial com tolerância de concentricidade ≤ 0,05 mm. Verificar relação de transmissão resultante após montagem.
-3. **Fixação e torque:** Apertar os parafusos de fixação com torque definido pelo fabricante. Utilizar trava de rosca (Loctite 243 ou equivalente) em ambientes sujeitos a vibração.
-4. **Verificação de rotação livre:** Rotacionar manualmente a cúpula 360° e confirmar ausência de interferências mecânicas, arrastar e pontos de travamento.
+``` text
+x = (π · d / 360) · θ
+```
 
-### 5.4. Etapa 3 — Cabeamento e Proteção
+Logo:
 
-| Item | Especificação |
-| :--- | :--- |
-| Cabo de sinal (SSI/BiSS-C) | Blindado, par trançado, AWG 24, comprimento máx. 100 m |
-| Cabo de alimentação | Mínimo 2 × AWG 22, com fusível de 0,5 A no positivo |
-| Aterramento da blindagem | Apenas no lado do controlador (aterramento em um ponto) |
-| Proteção do encoder | Capa de borracha ou caixa plástica IP67 adicional em ambientes externos |
-| Raio mínimo de curvatura | 10 × diâmetro externo do cabo |
-| Passa-cabos | Prensa-cabo PG11 com vedação para IP65 |
+``` text
+θ = (360 · x) / (π · d)
+```
 
-> **Atenção:** Manter os cabos de sinal do encoder separados (distância mínima de 20 cm) de cabos de alimentação de motores para evitar interferências eletromagnéticas (EMI).
+onde:
 
-### 5.5. Etapa 4 — Configuração e Comissionamento
+-   `θ` = posição angular da cúpula \[°\];
+-   `x` = deslocamento medido pelo encoder \[mm\];
+-   `d` = diâmetro primitivo do pinhão \[mm\].
 
-1. **Definição do ponto zero (referência):** Posicionar a cúpula com a abertura voltada para o Norte verdadeiro (azimute = 0° / 360°). Registrar a leitura bruta do encoder nesta posição como **offset de referência** no PLC.
-2. **Programação da relação mecânica:** Inserir no software do controlador o valor de $R_t$ calculado e o offset de referência.
-3. **Validação da leitura de azimute:**
-   - Mover a cúpula para azimutes conhecidos (90°, 180°, 270°) com auxílio de bússola ou clinômetro digital.
-   - Comparar a leitura do sistema com o valor esperado.
-   - Erro máximo aceitável: ±0,1° para usos amadores, ±0,01° para sistemas profissionais.
-4. **Teste de repetibilidade:** Executar 10 ciclos completos de rotação e retornar ao ponto zero; o desvio entre leituras deve ser inferior à resolução teórica calculada.
-5. **Integração com software astronômico:** Configurar a interface ASCOM / INDI conforme o protocolo utilizado (ModBus, Serial, Ethernet) para comunicação com o software de controle da montagem (Stellarium, Cartes du Ciel, TheSkyX, etc.).
+### Exemplo de dimensionamento
 
----
+Considere:
 
-## 6. Vantagens e Desvantagens / Restrições por Solução
+-   módulo do pinhão: `m = 1`;
+-   número de dentes: `z = 20`;
+-   diâmetro primitivo: `d = 20 mm`;
+-   resolução do encoder linear: `5 µm = 0,005 mm`.
 
-### 6.1. Solução 1 — Caixa Redutora 1:1 + Encoder Singleturn
+O deslocamento por volta é:
 
-#### ✅ Vantagens
+``` text
+L = π · 20
+L ≈ 62,83 mm/rev
+```
 
-* **Programação extremamente simples:** Leitura direta de 0° a 360°, sem conversões matemáticas no PLC.
-* **Sensor de menor custo unitário:** Encoders singleturn são universalmente disponíveis e mais baratos que modelos multivoltas.
-* **Compatibilidade com controladores legados:** Não exige suporte a multivoltas no hardware de leitura.
-* **Referenciamento imediato ao ligar:** Não há ambiguidade de volta — a posição absoluta é inequívoca em qualquer posição da cúpula.
+Portanto, uma volta do pinhão corresponde a 360° da posição mecânica
+equivalente.
 
-#### ❌ Desvantagens e Restrições
+A resolução angular ideal seria:
 
-* **Precisão angular severamente limitada:** Para alcançar ≤ 0,01°, são necessários encoders de ≥ 15 bits, com custo equivalente ou superior ao multivoltas.
-* **Folga mecânica amplificada:** Cada engrenagem adicional na caixa redutora contribui com folga acumulada, gerando zonas mortas de posicionamento.
-* **Custo total elevado:** Caixa de redução customizada (relação não-padrão), usinagem de pinhões especiais e manutenção periódica encarecem o projeto.
-* **Restrição de velocidade:** Caixas de redução customizadas podem ter limitações de velocidade máxima de operação.
-* **Restrição ambiental:** Caixas de engrenagens expostas a ambientes úmidos (cúpulas abertas) exigem vedação especial e lubrificação frequente.
+``` text
+Δθ = 0,005 / 62,83 · 360
+Δθ ≈ 0,0286°
+```
 
-### 6.2. Solução 2 — Acoplamento Direto com Encoder Absoluto Multivoltas
+Com encoder de 1 µm, a resolução teórica cairia para aproximadamente:
 
-#### ✅ Vantagens
+``` text
+Δθ ≈ 0,0057°
+```
 
-* **Alta resolução com sensor econômico:** A multiplicação mecânica natural do pinhão amplifica a resolução, permitindo usar encoders de menor resolução nativa para atingir precisão elevada.
-* **Menor backlash acumulado:** Sem engrenagens intermediárias, as únicas folgas são as do par cremalheira/pinhão, controladas diretamente.
-* **Robustez mecânica:** Poucos componentes móveis, menor probabilidade de falha e manutenção reduzida.
-* **Retenção de posição sem energia:** A tecnologia Wiegand utilizada em encoders multivoltas premium mantém a contagem de voltas mesmo sem alimentação, sem necessidade de bateria.
-* **Padrão industrial reconhecido:** Amplamente documentado e suportado por fabricantes de instrumentação e automação.
+**Atenção:** esses valores representam resolução geométrica/quantização.
+A precisão real será limitada por folga da engrenagem, erro de montagem,
+flexão estrutural, erro do encoder, temperatura, desgaste e
+deslizamento.
 
-#### ❌ Desvantagens e Restrições
+------------------------------------------------------------------------
 
-* **Custo unitário do encoder:** Encoders absolutos multivoltas custam tipicamente 2× a 4× o valor de um modelo singleturn equivalente.
-* **Lógica de conversão no software:** O firmware/PLC deve implementar a conversão da leitura bruta de voltas/posição para azimute em graus, gerenciando corretamente o rollover de 360°.
-* **Limitação de voltas:** O número máximo de voltas rastreadas é limitado pela capacidade multivoltas (ex.: 4 096 voltas para 12 bits). Para $R_t > 4096$, o encoder não consegue cobrir a totalidade de uma volta da cúpula — cenário improvável na prática.
-* **Restrição de protocolo:** Não todos os PLCs de baixo custo suportam nativamente protocolos de alta velocidade como BiSS-C ou EtherCAT; pode ser necessário adaptador.
+# 4. Descrição dos componentes
 
----
+## 4.1 Pinhão
 
-## 7. Produtos de Mercado e Análise de Custo
+O pinhão é o elemento responsável por transformar a relação mecânica
+entre a rotação da cúpula e o deslocamento do sistema de medição.
 
-### 7.1. Encoders Absolutos Singleturn — Produtos de Mercado
+### Recomendações
 
-| Fabricante | Modelo | Resolução | Interface | Proteção | Preço Estimado (USD) |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| **Heidenhain** | ECN 1313 | 23 bits | EnDat 2.2 | IP64 | \$800 – \$1 200 |
-| **Sick** | AFS60A-S4AK065536 | 16 bits | SSI | IP67 | \$350 – \$550 |
-| **Baumer** | BMMV 08I-1-R-360-8-B3 | 13 bits | SSI | IP67 | \$200 – \$350 |
-| **Kübler** | 8.5820.1331.1024 | 10 bits | SSI | IP65 | \$150 – \$250 |
-| **Omron** | E6C2-AG5C 360P/R | 9 bits | SSI | IP50 | \$80 – \$150 |
+-   aço carbono ou aço inoxidável;
+-   módulo compatível com a cremalheira;
+-   largura suficiente para suportar o esforço sem deformação;
+-   tratamento superficial quando houver exposição à umidade;
+-   montagem rígida no eixo;
+-   concentricidade adequada.
 
-### 7.2. Encoders Absolutos Multivoltas — Produtos de Mercado
+Um pinhão pequeno aumenta a resolução angular por unidade de
+deslocamento, mas aumenta a quantidade de deslocamento necessária para
+grandes ângulos e pode aumentar a sensibilidade a erros de fabricação.
 
-| Fabricante | Modelo | Resolução Singleturn | Capacidade Multivoltas | Interface | Proteção | Preço Estimado (USD) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Heidenhain** | EQN 1325 | 25 bits | 12 bits (4 096 v.) | EnDat 2.2 | IP64 | \$1 200 – \$2 000 |
-| **Sick** | AFM60A-S4AK262144 | 18 bits | 12 bits | SSI / BiSS-C | IP67 | \$500 – \$800 |
-| **Baumer** | GXMMW.B10P3614 | 17 bits | 16 bits | SSI | IP67 | \$400 – \$700 |
-| **Kübler** | 8.5868.1331.G131 | 13 bits | 12 bits | SSI / Profibus | IP67 | \$300 – \$500 |
-| **Pepperl+Fuchs** | WCS3B-LS311S | 13 bits | 16 bits | SSI | IP65 | \$350 – \$600 |
-| **Posital (FRABA)** | OCD-S5B1B-1416-S100-PRM | 16 bits | 14 bits | SSI | IP67 | \$250 – \$450 |
+------------------------------------------------------------------------
 
-> **Nota:** Preços estimados com base em cotações de mercado (2024–2025). Valores reais variam conforme quantidade, distribuidor, câmbio e tarifas de importação.
+## 4.2 Cremalheira
 
-### 7.3. Componentes Mecânicos Auxiliares — Produtos de Mercado
+A cremalheira deve ser rigidamente associada à estrutura móvel da
+cúpula.
 
-| Componente | Fabricante / Modelo | Aplicação | Preço Estimado (USD) |
-| :--- | :--- | :--- | :---: |
-| Acoplamento flexível de fole | **Rexnord** / Jaw Coupling | Conexão encoder-pinhão (Sol. 2) | \$30 – \$80 |
-| Caixa de redução planetária | **Neugart** PLE 040 | Redução 1:N customizada (Sol. 1) | \$300 – \$800 |
-| Pinhão de aço inox (M3, Z20) | Usinagem local / KHK Gears | Pinhão leitor | \$20 – \$60 |
-| Suporte/Bracket em alumínio | Usinagem local | Fixação do encoder na estrutura | \$50 – \$150 |
-| Cabo blindado SSI (por metro) | **Lapp** / ÖLFLEX® SERVO | Cabeamento de sinal | \$3 – \$8 /m |
-| Conector M12 (8 pinos) | **Phoenix Contact** / **Binder** | Conexão encoder | \$8 – \$20 |
+Sua função é transformar a rotação relativa entre cúpula e base em
+deslocamento linear.
 
-### 7.4. Estimativa de Custo Total do Sistema
+### Requisitos
 
-| Componente | Solução 1 (Singleturn + Caixa) | Solução 2 (Multivoltas Direto) |
-| :--- | :---: | :---: |
-| Encoder | \$150 – \$500 | \$300 – \$900 |
-| Caixa de redução customizada | \$300 – \$800 | — |
-| Pinhão leitor e acoplamento | \$50 – \$150 | \$50 – \$130 |
-| Suporte mecânico e usinagem | \$100 – \$250 | \$60 – \$150 |
-| Cabeamento e conectores | \$50 – \$120 | \$50 – \$120 |
-| PLC / controlador compatível | \$200 – \$500 | \$200 – \$500 |
-| Mão de obra de instalação | \$150 – \$400 | \$100 – \$250 |
-| **Total Estimado** | **\$1 000 – \$2 720** | **\$760 – \$2 050** |
-| **Custo de Manutenção Anual** | \$150 – \$300 | \$30 – \$80 |
+-   módulo igual ao do pinhão;
+-   alinhamento adequado;
+-   baixa folga;
+-   comprimento suficiente para cobrir todo o movimento útil;
+-   fixação rígida;
+-   proteção contra sujeira e água.
 
-> **Análise de Custo Total de Propriedade (TCO):** Considerando um ciclo de vida de 10 anos, a Solução 2 representa uma economia estimada de **30% a 50%** em relação à Solução 1, mesmo com o maior custo inicial do encoder multivoltas, devido à eliminação da caixa de redução e à redução drástica dos custos de manutenção mecânica.
+Para uma cúpula com rotação de 360°, é necessário considerar se a
+cremalheira será:
 
----
+-   circular, acompanhando o perímetro da cúpula; ou
+-   linear, em uma solução mecânica com movimento equivalente.
 
-**Conclusão Geral:** Para implementações em observatórios astronômicos, a **Solução 2** — encoder absoluto multivoltas acoplado diretamente ao pinhão leitor — é superior em todos os critérios técnicos relevantes (precisão, robustez, backlash, manutenção) e apresenta custo total de propriedade inferior ao longo da vida útil do sistema. A Solução 1 permanece adequada para contextos didáticos, protótipos de baixo orçamento ou aplicações onde a simplicidade de software supera as limitações de precisão.
+Para uma cúpula astronômica, a alternativa circular normalmente é mais
+natural.
+
+------------------------------------------------------------------------
+
+## 4.3 Encoder linear
+
+O encoder linear é o sensor responsável pela medição direta do
+deslocamento do carro.
+
+Uma opção particularmente interessante é um **encoder linear magnético
+incremental**, pois tende a ser mais tolerante a poeira e contaminantes
+do que soluções ópticas abertas.
+
+Como referência industrial, a Balluff possui a família BML de encoders
+lineares magnéticos. Há versões incrementais com saída A/B e resolução
+na faixa de micrômetros, além de versões absolutas com interfaces como
+SSI e BiSS-C.
+
+Exemplo de produto:
+
+-   Balluff BML-S1F1: sistema magnético incremental;
+-   saída digital A/B em RS-422;
+-   resolução de 5 µm em uma configuração disponível;
+-   construção compacta.
+
+A Balluff também possui sistemas BML com comprimentos de medição de
+vários metros, o que demonstra a adequação da tecnologia para sistemas
+de deslocamento maiores.
+
+------------------------------------------------------------------------
+
+## 4.4 Bloco de guia linear
+
+O bloco de guia mantém o conjunto do encoder alinhado e permite que ele
+se movimente somente no eixo previsto.
+
+A utilização de uma guia linear é importante porque evita que forças
+laterais sejam transmitidas diretamente ao encoder.
+
+Para um protótipo, guias do tipo MGN12 podem ser utilizadas.
+
+Para uma aplicação externa permanente, recomenda-se utilizar uma guia
+industrial dimensionada para:
+
+-   massa do conjunto;
+-   aceleração;
+-   vibração;
+-   exposição ambiental;
+-   número de ciclos;
+-   tolerâncias de montagem.
+
+------------------------------------------------------------------------
+
+## 4.5 Mecanismo de mola
+
+A mola mantém o conjunto pressionado contra a referência mecânica.
+
+Sua função é compensar pequenas variações de distância, desalinhamentos
+e deformações.
+
+### Vantagens
+
+-   reduz a possibilidade de perda de contato;
+-   permite compensação de tolerâncias;
+-   reduz esforços causados por desalinhamentos;
+-   facilita a montagem;
+-   permite que o conjunto acompanhe pequenas irregularidades.
+
+### Cuidados
+
+A força da mola deve ser suficiente para manter o contato, mas não
+excessiva.
+
+Uma força muito elevada pode:
+
+-   aumentar o atrito;
+-   gerar desgaste;
+-   aumentar o torque necessário do sistema de acionamento;
+-   deformar componentes;
+-   introduzir erro de medição.
+
+------------------------------------------------------------------------
+
+## 4.6 Acoplamento de junta
+
+O acoplamento entre o eixo e o elemento de medição deve absorver
+pequenos desalinhamentos.
+
+Um acoplamento flexível é preferível a uma ligação rígida quando houver
+possibilidade de:
+
+-   desalinhamento angular;
+-   desalinhamento paralelo;
+-   pequenas vibrações;
+-   expansão térmica.
+
+O acoplamento deve ser selecionado considerando torque, rotação máxima,
+desalinhamento admissível e ambiente.
+
+------------------------------------------------------------------------
+
+# 5. Arquitetura da instalação
+
+A montagem recomendada é:
+
+``` text
+                 CÚPULA
+                   │
+            Cremalheira circular
+                   │
+                 Pinhão
+                   │
+           Acoplamento flexível
+                   │
+           Carro do encoder
+                   │
+        ┌────────────────────┐
+        │  Encoder linear    │
+        └────────────────────┘
+                   │
+             Guia linear
+                   │
+                  Base
+                   │
+             Controlador
+```
+
+O conjunto deve ser instalado em uma região da base que permita:
+
+-   acesso para manutenção;
+-   proteção contra chuva;
+-   inspeção visual;
+-   ajuste da mola;
+-   ajuste do alinhamento;
+-   substituição do encoder.
+
+------------------------------------------------------------------------
+
+# 6. Detalhamento da instalação
+
+## Etapa 1 --- Definição do ponto de medição
+
+Escolher uma região estrutural da cúpula onde seja possível obter
+movimento mecânico proporcional ao ângulo azimutal.
+
+O ponto deve apresentar:
+
+-   baixa flexão;
+-   baixa vibração;
+-   boa rigidez;
+-   acesso para manutenção.
+
+------------------------------------------------------------------------
+
+## Etapa 2 --- Instalação da cremalheira
+
+A cremalheira deve ser instalada concentricamente em relação ao eixo de
+rotação da cúpula.
+
+O erro de concentricidade é especialmente importante porque pode gerar
+uma velocidade de deslocamento variável durante a rotação.
+
+A estrutura deve possuir regulagem para permitir:
+
+-   ajuste radial;
+-   ajuste vertical;
+-   ajuste de paralelismo;
+-   ajuste da profundidade de engrenamento.
+
+------------------------------------------------------------------------
+
+## Etapa 3 --- Instalação do pinhão
+
+O pinhão deve ser montado no eixo correspondente e alinhado com a
+cremalheira.
+
+Deve-se evitar:
+
+-   desalinhamento;
+-   engrenamento excessivo;
+-   folga excessiva;
+-   contato apenas em uma região dos dentes.
+
+------------------------------------------------------------------------
+
+## Etapa 4 --- Montagem da guia linear
+
+A guia deve ser fixada em uma base rígida.
+
+A superfície de montagem deve ser suficientemente plana para não
+introduzir esforços no carro.
+
+Para protótipos, uma guia MGN12 de aproximadamente 300 mm pode ser
+suficiente para validar o conceito. Em uma aplicação final, o curso deve
+ser definido a partir da geometria real do pinhão e do deslocamento
+necessário.
+
+------------------------------------------------------------------------
+
+## Etapa 5 --- Montagem do encoder
+
+O encoder deve ser instalado no carro de forma que seu eixo de medição
+esteja alinhado com o deslocamento produzido pelo pinhão.
+
+O fabricante do encoder deve ser seguido quanto a:
+
+-   distância entre sensor e escala;
+-   tolerância de paralelismo;
+-   fixação;
+-   raio mínimo do cabo;
+-   aterramento;
+-   alimentação;
+-   blindagem.
+
+Encoders magnéticos Balluff BML, por exemplo, possuem especificações
+explícitas de distância de leitura e tolerâncias de instalação.
+
+------------------------------------------------------------------------
+
+## Etapa 6 --- Ajuste da mola
+
+A mola deve manter o conjunto pressionado contra a referência mecânica
+durante todo o movimento.
+
+O ajuste deve ser realizado verificando:
+
+1.  contato em toda a faixa angular;
+2.  ausência de travamento;
+3.  ausência de escorregamento;
+4.  torque adicional exigido pelo acionamento;
+5.  repetibilidade da leitura.
+
+------------------------------------------------------------------------
+
+## Etapa 7 --- Calibração
+
+Após a instalação, deve-se determinar a relação real entre deslocamento
+e ângulo.
+
+Recomenda-se utilizar pelo menos três pontos de referência:
+
+``` text
+0°
+180°
+360°
+```
+
+Idealmente, utilizar mais pontos, por exemplo:
+
+``` text
+0°, 30°, 60°, 90°, ..., 360°
+```
+
+Os valores devem ser comparados com uma referência externa.
+
+A curva de calibração pode ser armazenada no controlador para compensar
+pequenos erros sistemáticos.
+
+------------------------------------------------------------------------
+
+# 7. Sistema eletrônico
+
+O encoder pode fornecer sinais incrementais A/B.
+
+A sequência dos sinais determina o sentido de movimento.
+
+A posição pode ser obtida por contagem de pulsos:
+
+``` text
+Pulsos → Deslocamento → Ângulo
+```
+
+Para um encoder incremental, é recomendável utilizar:
+
+-   entrada de contador de alta velocidade;
+-   interrupções;
+-   FPGA;
+-   PLC com entrada de encoder;
+-   microcontrolador com periférico de encoder.
+
+Em um sistema baseado em STM32, por exemplo, os timers podem operar no
+modo de encoder para realizar a contagem dos canais A/B.
+
+### Cuidados elétricos
+
+Como a cúpula pode possuir motores, inversores e cabos de potência
+próximos ao sensor, recomenda-se:
+
+-   cabo blindado;
+-   aterramento adequado;
+-   separação entre potência e sinal;
+-   par trançado para sinais diferenciais;
+-   interface RS-422 quando disponível;
+-   proteção contra surtos;
+-   fonte estabilizada.
+
+------------------------------------------------------------------------
+
+# 8. Vantagens da solução
+
+## 8.1 Medição indireta com alta resolução
+
+A utilização do pinhão permite converter pequenos deslocamentos em uma
+representação precisa da posição angular.
+
+## 8.2 Possibilidade de redundância
+
+A solução pode coexistir com outro sensor, como:
+
+-   encoder absoluto;
+-   sensor de referência;
+-   sensor Hall;
+-   fim de curso;
+-   inclinômetro.
+
+Isso é particularmente interessante para um sistema astronômico, no qual
+a perda de referência pode comprometer o apontamento.
+
+## 8.3 Manutenção relativamente simples
+
+O conjunto pode ser construído de forma modular:
+
+-   encoder;
+-   guia;
+-   mola;
+-   pinhão;
+-   acoplamento.
+
+Isso facilita a substituição individual dos componentes.
+
+## 8.4 Possibilidade de utilizar componentes comerciais
+
+Guias lineares, encoders, acoplamentos e componentes de transmissão são
+facilmente encontrados no mercado.
+
+## 8.5 Boa possibilidade de proteção ambiental
+
+Um encoder magnético pode ser instalado dentro de uma carcaça protegida,
+enquanto a cremalheira e o pinhão podem receber proteção contra chuva e
+poeira.
+
+## 8.6 Custo inferior a soluções metrológicas de alto desempenho
+
+Uma arquitetura construída com componentes industriais convencionais
+pode custar significativamente menos que um sistema absoluto de alta
+precisão para máquinas-ferramenta.
+
+------------------------------------------------------------------------
+
+# 9. Desvantagens e restrições
+
+## 9.1 Folga mecânica
+
+A folga entre pinhão e cremalheira pode produzir erro de posição,
+principalmente durante a inversão do sentido de rotação.
+
+Esse é um dos principais pontos de atenção da solução.
+
+### Mitigação
+
+Pode-se utilizar:
+
+-   pinhão de baixa folga;
+-   cremalheira de precisão;
+-   pré-carga;
+-   sistema de dois pinhões;
+-   engrenagem dividida com mola;
+-   calibração por sentido.
+
+------------------------------------------------------------------------
+
+## 9.2 Erro de concentricidade
+
+Se a cremalheira circular não estiver perfeitamente concêntrica ao eixo
+da cúpula, a relação entre ângulo e deslocamento pode variar ao longo da
+volta.
+
+Esse erro pode ser corrigido parcialmente por calibração.
+
+------------------------------------------------------------------------
+
+## 9.3 Desgaste
+
+O contato mecânico entre pinhão e cremalheira sofre desgaste.
+
+É necessário considerar:
+
+-   lubrificação;
+-   material;
+-   dureza;
+-   corrosão;
+-   contaminação;
+-   frequência de operação.
+
+------------------------------------------------------------------------
+
+## 9.4 Vibração
+
+Uma cúpula possui grandes massas e pode sofrer vibrações devido ao vento
+e ao motor.
+
+A estrutura do sensor deve possuir rigidez suficiente para evitar que
+vibrações sejam interpretadas como movimento angular.
+
+------------------------------------------------------------------------
+
+## 9.5 Dependência de montagem
+
+A precisão final não depende somente do encoder.
+
+O erro total pode ser influenciado por:
+
+``` text
+Erro total =
+encoder
++ engrenagem
++ montagem
++ flexão
++ folga
++ temperatura
++ calibração
+```
+
+------------------------------------------------------------------------
+
+## 9.6 Limitação de curso
+
+O encoder linear possui um curso máximo.
+
+O curso necessário deve ser calculado antes da seleção.
+
+Por exemplo, com um pinhão de diâmetro primitivo de 20 mm:
+
+``` text
+360° → 62,83 mm
+```
+
+Portanto, para medir uma volta completa sem utilizar um sistema circular
+de referência, o curso linear necessário seria aproximadamente 62,8 mm.
+
+------------------------------------------------------------------------
+
+# 10. Produtos comerciais que podem ser utilizados
+
+## 10.1 Encoder linear magnético Balluff BML
+
+A família Balluff BML oferece soluções magnéticas lineares incrementais
+e absolutas.
+
+Um exemplo, o BML0916, possui:
+
+-   saída digital A/B;
+-   interface RS-422;
+-   resolução de 5 µm;
+-   corpo compacto;
+-   construção em alumínio.
+
+É uma das opções mais próximas do conceito apresentado.
+
+Fonte: Balluff --- BML0916.
+
+------------------------------------------------------------------------
+
+## 10.2 Balluff BML S1H / BML S1G
+
+Para uma solução mais sofisticada, existem versões absolutas da família
+BML.
+
+O BML S1H pode trabalhar com SSI/BiSS-C e apresenta resolução
+submicrométrica em determinadas configurações.
+
+O BML S1G possui opções para comprimentos de medição de até dezenas de
+metros e resolução configurável.
+
+Essas soluções são mais apropriadas quando o projeto exige elevada
+confiabilidade e precisão.
+
+------------------------------------------------------------------------
+
+## 10.3 HEIDENHAIN LC 400
+
+A HEIDENHAIN possui encoders lineares absolutos LC 400 destinados a
+aplicações de alta precisão.
+
+É uma solução de nível muito superior ao necessário para um protótipo
+acadêmico, mas serve como referência para uma aplicação profissional de
+alta precisão.
+
+A série possui diversos comprimentos de medição e recursos específicos
+para instalação e alinhamento.
+
+------------------------------------------------------------------------
+
+## 10.4 Renishaw TONiC
+
+A Renishaw possui sistemas de encoders lineares ópticos de alto
+desempenho.
+
+São adequados quando a prioridade é precisão muito elevada.
+
+Para uma cúpula externa, entretanto, a proteção ambiental e o custo
+precisam ser avaliados cuidadosamente.
+
+------------------------------------------------------------------------
+
+# 11. Alternativa comercial simplificada
+
+Uma alternativa é utilizar diretamente um **encoder rotativo com roda de
+medição**.
+
+Nesse caso:
+
+``` text
+Cúpula → roda de medição → encoder rotativo → controlador
+```
+
+Existem inclusive suportes comerciais com mola para manter a roda em
+contato com a superfície.
+
+No Brasil, encontram-se kits de suporte com mola e roda de medição para
+encoders incrementais.
+
+Essa arquitetura pode ser consideravelmente mais barata e mais simples
+de implementar, mas introduz a possibilidade de:
+
+-   escorregamento;
+-   desgaste da roda;
+-   erro de contato;
+-   sujeira;
+-   variação de diâmetro efetivo da roda.
+
+Por isso, a solução com pinhão/cremalheira tende a ser mecanicamente
+mais determinística quando a transmissão é bem projetada.
+
+------------------------------------------------------------------------
+
+# 12. Estimativa de custo
+
+Os valores abaixo são estimativas para projeto no Brasil e devem ser
+usados como referência de orçamento, não como cotação.
+
+  Componente                                                  Faixa estimada
+  ----------------------------------------------- --------------------------
+  Encoder linear magnético de baixo/médio custo         R\$ 500 -- R\$ 2.500
+  Encoder linear industrial de alta precisão        R\$ 3.000 -- R\$ 15.000+
+  Guia linear                                              R\$ 70 -- R\$ 350
+  Pinhão                                                   R\$ 50 -- R\$ 200
+  Cremalheira                                             R\$ 100 -- R\$ 500
+  Acoplamento flexível                                     R\$ 50 -- R\$ 250
+  Mola e suporte                                           R\$ 30 -- R\$ 150
+  Base usinada/fixadores                                  R\$ 150 -- R\$ 600
+  Proteção/carenagem                                      R\$ 100 -- R\$ 500
+  Cabeamento e conectores                                  R\$ 50 -- R\$ 250
+  Eletrônica/interface                                    R\$ 100 -- R\$ 500
+  Usinagem e montagem                                   R\$ 300 -- R\$ 1.500
+
+### Total estimado
+
+**Protótipo econômico:**
+
+> aproximadamente **R\$ 1.400 -- R\$ 3.500**
+
+**Sistema industrial intermediário:**
+
+> aproximadamente **R\$ 3.500 -- R\$ 8.000**
+
+**Sistema de alta precisão:**
+
+> pode ultrapassar **R\$ 10.000 -- R\$ 20.000**, dependendo
+> principalmente do encoder, precisão mecânica e serviço de
+> instalação/calibração.
+
+Como referência de mercado brasileiro, anúncios atuais de encoders
+rotativos incrementais de 1024 PPR variam aproximadamente de R\$ 200 a
+mais de R\$ 3.000, dependendo da marca, interface e especificação. Isso
+demonstra que o sensor escolhido tem grande impacto no orçamento.
+
+------------------------------------------------------------------------
+
+# 13. Exemplo de configuração recomendada para protótipo
+
+Para validar o conceito antes de investir em um encoder industrial caro,
+uma configuração inicial poderia ser:
+
+  Item          Especificação sugerida
+  ------------- ------------------------------------------
+  Pinhão        módulo 1, 20 dentes
+  Cremalheira   módulo 1
+  Encoder       linear magnético incremental, 5 µm
+  Guia          MGN12 ou equivalente
+  Curso         ≥ 70 mm
+  Mola          pré-carga regulável
+  Acoplamento   flexível
+  Controlador   STM32 / ESP32 / PLC
+  Interface     A/B, preferencialmente diferencial
+  Proteção      IP54 ou superior para conjunto protegido
+  Referência    sensor de zero + encoder incremental
+
+A configuração de 20 dentes e módulo 1 produz aproximadamente:
+
+``` text
+62,83 mm/rev
+```
+
+Assim, um encoder com resolução de 5 µm fornece aproximadamente:
+
+``` text
+0,0286° por incremento ideal
+```
+
+Esse valor é mais do que suficiente para um protótipo de controle de
+azimute, desde que os erros mecânicos sejam controlados.
+
+------------------------------------------------------------------------
+
+# 14. Calibração recomendada
+
+Para obter melhor desempenho, recomenda-se realizar uma calibração
+completa após a montagem.
+
+Um procedimento possível:
+
+1.  posicionar a cúpula em 0°;
+2.  zerar o contador;
+3.  mover para 30°;
+4.  registrar a leitura;
+5.  repetir em intervalos de 30° até 360°;
+6.  repetir o procedimento no sentido contrário;
+7.  calcular erro de posição;
+8.  identificar histerese;
+9.  criar uma tabela de compensação.
+
+A diferença entre os resultados de ida e volta é especialmente
+importante para identificar **backlash**.
+
+------------------------------------------------------------------------
+
+# 15. Recomendações de projeto
+
+Antes da fabricação definitiva, recomenda-se:
+
+### Prioridade 1 --- Resolver a transmissão mecânica
+
+A interface:
+
+**cúpula → cremalheira → pinhão → encoder**
+
+deve possuir geometria claramente definida.
+
+### Prioridade 2 --- Reduzir folga
+
+O backlash pode ser mais significativo que a resolução do encoder.
+
+### Prioridade 3 --- Proteger o conjunto
+
+O sensor deve ser protegido contra:
+
+-   chuva;
+-   poeira;
+-   condensação;
+-   insetos;
+-   radiação solar direta;
+-   corrosão.
+
+### Prioridade 4 --- Criar referência absoluta
+
+Mesmo utilizando encoder incremental, recomenda-se adicionar um sensor
+de referência/zero.
+
+### Prioridade 5 --- Testar antes da instalação
+
+O sistema deve ser testado em bancada com:
+
+-   rotação lenta;
+-   rotação rápida;
+-   inversão de sentido;
+-   vibração;
+-   ciclos repetitivos.
+
+------------------------------------------------------------------------
+
+# 16. Conclusão
+
+A solução proposta é uma arquitetura **mecatrônica de medição angular
+indireta**, na qual o movimento angular da cúpula é convertido em
+deslocamento linear e posteriormente medido por um encoder.
+
+Sua principal vantagem é combinar:
+
+-   alta resolução;
+-   componentes comerciais;
+-   manutenção relativamente simples;
+-   possibilidade de calibração;
+-   integração direta com um controlador;
+-   possibilidade de operação em malha fechada.
+
+O ponto mais crítico do projeto não é a resolução do encoder, mas a
+**qualidade da transmissão mecânica**. Folga, concentricidade, rigidez,
+desalinhamento e escorregamento podem gerar erros muito maiores do que o
+erro de quantização do sensor.
+
+Para um protótipo acadêmico, recomenda-se começar com um encoder
+magnético incremental de aproximadamente 5 µm, guia linear compacta,
+pinhão/cremalheira módulo 1 e referência de zero. Depois de validar a
+arquitetura, pode-se migrar para um encoder absoluto industrial caso os
+requisitos de confiabilidade e precisão justifiquem o investimento.
+
+------------------------------------------------------------------------
+
+# 17. Referências e produtos consultados
+
+-   Balluff --- família de encoders lineares magnéticos BML.
+-   Balluff --- BML0916, encoder linear magnético incremental.
+-   Balluff --- BML S1H / BML S1G.
+-   HEIDENHAIN --- encoders lineares LC 400.
+-   Mercado Livre Brasil --- referências de preços de encoders
+    incrementais de 1024 PPR.
+-   Mercado Livre Brasil --- referências de preços de guias lineares
+    MGN12.
+-   PRIMTEC --- suporte com mola e roda de medição para encoder
+    incremental.
+-   SE Instrumentos --- suportes articulados e soluções de medição com
+    encoder.
+
+> **Observação de orçamento:** preços de marketplace são voláteis e
+> podem variar com câmbio, impostos, frete, disponibilidade e
+> fornecedor. Para a especificação final da cúpula, deve-se solicitar
+> cotação diretamente ao fabricante/distribuidor.
 
