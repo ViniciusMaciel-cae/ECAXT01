@@ -50,8 +50,7 @@ Os parâmetros nominais de hardware adotados para a validação do SMFMSI são d
 - **Estrutura da Fita:** Chapa de aço galvanizado cortada a laser em formato curvo, fixada na parede interna (côncava) da cúpula.
 - **Roda Guia:** Roda orientada no eixo horizontal. Material da banda de rodagem: Poliuretano (PU) fundido. Dureza especificada: 75 a 85 Shore A (otimizado para evitar deformação que altere o *air gap*).
 - **Sensoriamento:** Sensores indutivos tubulares M18 PNP com distância sensora de 8 mm.
-- **Processamento de Sinais:** Controlador Lógico Programável (CLP) modelo MicroLogix 1100 Series B. Utilização das entradas de *High-Speed Counter* (HSC).
-- **Ambiente de Simulação e Validação:** Lógica Ladder estruturada no RSLogix Micro Starter Lite e validada no RSLogix Emulate 500 via RSLinx Classic.
+- **Processamento de Sinais:** Controlador Lógico Programável (CLP). Utilização das entradas de *High-Speed Counter* (HSC).
 - **Mecânica Articulada:** Sistema de guias lineares duplas de aço polido, suportadas por um totem de concreto ou metal na estrutura fixa.
 
 ---
