@@ -70,7 +70,7 @@ A adoção da fita metálica com sensores indutivos entrega as seguintes vantage
 
 Existem limitações técnicas inerentes à escolha de componentes que requerem atenção:
 
-- **Necessidade de Calibração Pós-Apagão:** Embora o MicroLogix 1100 utilize memória retentiva para salvar o último valor lido instantaneamente durante perdas de energia curtas, a movimentação manual do teto com o painel elétrico desligado exigirá um ciclo autônomo de *Homing* (retorno a um terceiro sensor de Ponto Zero) ao religar.
+- **Necessidade de Calibração Pós-Apagão:** Durante perdas de energia curtas, a movimentação manual do teto com o painel elétrico desligado exigirá um ciclo autônomo de *Homing* (retorno a um terceiro sensor de Ponto Zero) ao religar.
 - **Limite Mecânico de Resolução:** A precisão do sistema está limitada ao quão finos e próximos os furos podem ser cortados na chapa de aço pelo fornecedor sem comprometer a integridade estrutural do "zíper".
 - **Desgaste da Roda Guia:** A erosão natural da roda de poliuretano, ainda que lenta, altera minimamente o *air gap* dos sensores ao longo de vários anos, necessitando de inspeção visual periódica.
 
