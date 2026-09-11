@@ -1,0 +1,2370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador 3D - Solução 2: Medição Angular de Cúpula com Pinhão, Encoder e Pré-carga por Mola</title>
+    
+    <!-- Three.js e OrbitControls via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Fontes Google Inter e JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-space: #050811;
+            --panel-bg: rgba(10, 16, 30, 0.88);
+            --panel-border: rgba(0, 240, 255, 0.28);
+            --panel-glow: rgba(0, 240, 255, 0.12);
+            --accent-cyan: #00f0ff;
+            --accent-blue: #0088ff;
+            --accent-orange: #ff9900;
+            --accent-green: #10e080;
+            --accent-red: #ff3b5c;
+            --accent-gold: #fbbf24;
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-space);
+            font-family: var(--font-sans);
+            color: var(--text-main);
+        }
+
+        #webgl-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            outline: none;
+        }
+
+        /* Overlay UI Container - Totalmente Transparente e Flutuante */
+        .hud-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            overflow: hidden;
+            transition: opacity 0.25s ease;
+        }
+
+        body.hud-hidden .hud-overlay {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .interactive {
+            pointer-events: auto;
+        }
+
+        /* Glassmorphism Panel Compacto */
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), 0 0 10px var(--panel-glow);
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-cyan) transparent;
+            user-select: none;
+            transition: max-height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), 
+                        width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+                        opacity 0.2s ease,
+                        box-shadow 0.2s;
+        }
+
+        .glass-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+        .glass-panel::-webkit-scrollbar-thumb {
+            background: var(--accent-cyan);
+            border-radius: 2px;
+        }
+
+        /* Painel Esquerdo: Telemetria (Compacto e Reposicionado) */
+        .panel-telemetry {
+            position: fixed;
+            left: 12px;
+            top: 50px;
+            width: 250px;
+            max-height: calc(100vh - 105px);
+            z-index: 15;
+        }
+
+        /* Painel Direito: Controles de Operação (Compacto, no Canto e Arrastável) */
+        .panel-controls {
+            position: fixed;
+            right: 12px;
+            top: 50px;
+            width: 260px;
+            max-height: calc(100vh - 105px);
+            z-index: 15;
+        }
+
+        /* Estado Minimizado / Recolhido dos Painéis */
+        .glass-panel.panel-collapsed {
+            max-height: 36px !important;
+            height: 36px !important;
+            min-height: 36px !important;
+            width: 180px !important;
+            overflow: hidden !important;
+            padding: 6px 10px !important;
+            background: rgba(10, 16, 30, 0.96);
+            border-color: rgba(0, 240, 255, 0.5);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.8), 0 0 10px rgba(0, 240, 255, 0.25);
+        }
+
+        .glass-panel.panel-collapsed > *:not(.panel-header-bar) {
+            display: none !important;
+        }
+
+        /* Barra de Cabeçalho do Painel com Botão Minimizar e Handle de Arraste */
+        .panel-header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 240, 255, 0.22);
+            padding-bottom: 5px;
+            margin-bottom: 2px;
+            cursor: grab;
+        }
+
+        .panel-header-bar:active {
+            cursor: grabbing;
+        }
+
+        .glass-panel.panel-collapsed .panel-header-bar {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+            height: 100%;
+        }
+
+        .panel-header-title {
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: var(--accent-cyan);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            pointer-events: none;
+        }
+
+        .panel-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-panel-action {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            color: var(--accent-cyan);
+            border-radius: 4px;
+            width: 22px;
+            height: 22px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-panel-action:hover {
+            background: var(--accent-cyan);
+            color: #030712;
+            box-shadow: 0 0 8px var(--accent-cyan);
+        }
+
+        /* Header Top Bar Slim */
+        .hud-header {
+            position: fixed;
+            top: 8px;
+            left: 12px;
+            right: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(8, 13, 25, 0.94);
+            border: 1px solid rgba(0, 240, 255, 0.35);
+            border-radius: 8px;
+            padding: 5px 14px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.65);
+            z-index: 20;
+            height: 38px;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-badge {
+            background: linear-gradient(135deg, #00f0ff, #0051ff);
+            color: #030712;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 3px 7px;
+            border-radius: 4px;
+            letter-spacing: 0.8px;
+        }
+
+        .header-titles h1 {
+            font-size: 0.84rem;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-titles p {
+            display: none; /* Ocultar subtítulo longo no topo para manter slim */
+        }
+
+        .header-quick-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-header-tool {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-main);
+            border-radius: 5px;
+            padding: 3px 8px;
+            font-size: 0.72rem;
+            font-family: var(--font-sans);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-header-tool:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            background: rgba(0, 240, 255, 0.12);
+        }
+
+        .badge-live {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: rgba(16, 224, 128, 0.1);
+            border: 1px solid rgba(16, 224, 128, 0.35);
+            color: var(--accent-green);
+        }
+
+        .pulse-led {
+            width: 6px;
+            height: 6px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            box-shadow: 0 0 6px var(--accent-green);
+            animation: pulse-glow 1.8s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.8); }
+        }
+
+        /* Seções Internas dos Painéis */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 240, 255, 0.18);
+            padding-bottom: 3px;
+            margin-top: 2px;
+        }
+
+        .section-header h2 {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: var(--accent-cyan);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .section-tag {
+            font-family: var(--font-mono);
+            font-size: 0.62rem;
+            color: var(--text-dim);
+            background: rgba(255,255,255,0.06);
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+
+        /* Telemetry Cards Compact */
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .telemetry-card {
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 6px;
+            padding: 6px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            transition: border-color 0.2s;
+        }
+
+        .telemetry-card:hover {
+            border-color: rgba(0, 240, 255, 0.4);
+        }
+
+        .telemetry-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .card-label {
+            font-size: 0.64rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .card-value {
+            font-family: var(--font-mono);
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 0.3px;
+        }
+
+        .card-subtext {
+            font-family: var(--font-mono);
+            font-size: 0.62rem;
+            color: var(--accent-cyan);
+        }
+
+        .value-highlight-orange { color: var(--accent-orange); }
+        .value-highlight-cyan { color: var(--accent-cyan); }
+        .value-highlight-green { color: var(--accent-green); }
+        .value-highlight-gold { color: var(--accent-gold); }
+
+        /* Controls Widgets Compactos */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .control-label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        .control-label-row span.val {
+            font-family: var(--font-mono);
+            color: var(--accent-cyan);
+            font-weight: 600;
+            font-size: 0.7rem;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 2px;
+            outline: none;
+            transition: background 0.2s;
+        }
+
+        input[type=range]:hover {
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 8px var(--accent-cyan);
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.25);
+        }
+
+        /* Buttons Grid Compact */
+        .btn-group {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 5px;
+            color: var(--text-main);
+            padding: 5px 8px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: var(--font-sans);
+        }
+
+        .btn:hover {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--accent-cyan);
+            color: #ffffff;
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.btn-primary {
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(0, 136, 255, 0.35));
+            border-color: var(--accent-cyan);
+            color: #ffffff;
+        }
+
+        .btn.btn-primary:hover {
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.4), rgba(0, 136, 255, 0.5));
+        }
+
+        .btn.btn-active {
+            background: var(--accent-cyan);
+            color: #030712;
+            font-weight: 700;
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+        }
+
+        .btn.btn-danger {
+            border-color: rgba(255, 59, 92, 0.4);
+            color: var(--accent-red);
+        }
+        .btn.btn-danger:hover {
+            background: rgba(255, 59, 92, 0.2);
+            border-color: var(--accent-red);
+        }
+
+        .btn-icon {
+            font-size: 0.8rem;
+        }
+
+        /* Camera Views Toolbar (Bottom Center) */
+        .camera-toolbar {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 15;
+        }
+
+        .pill-dock {
+            background: rgba(10, 16, 30, 0.94);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 24px;
+            padding: 4px 10px;
+            display: flex;
+            gap: 6px;
+            box-shadow: 0 6px 25px rgba(0,0,0,0.7);
+        }
+
+        .pill-dock .btn {
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            border-radius: 14px;
+        }
+
+        /* Spring Force Gauge Bar */
+        .gauge-bar-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            width: 50%;
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-orange), var(--accent-red));
+            transition: width 0.08s ease-out;
+            border-radius: 4px;
+        }
+
+        /* Floating Restore HUD Button */
+        #btn-floating-show-hud {
+            position: fixed;
+            top: 10px;
+            right: 14px;
+            z-index: 30;
+            display: none;
+            padding: 5px 12px;
+            font-size: 0.72rem;
+            border-radius: 6px;
+        }
+
+        /* Exploded Callout Annotations Overlay */
+        .annotation-marker {
+            position: absolute;
+            pointer-events: auto;
+            transform: translate(-50%, -100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: opacity 0.3s, transform 0.2s;
+            opacity: 0;
+            visibility: hidden;
+            z-index: 20;
+        }
+
+        .annotation-marker.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .annotation-marker:hover {
+            transform: translate(-50%, -105%) scale(1.05);
+        }
+
+        .marker-card {
+            background: rgba(7, 12, 22, 0.95);
+            border: 1px solid var(--accent-cyan);
+            box-shadow: 0 0 14px rgba(0, 240, 255, 0.4);
+            border-radius: 6px;
+            padding: 5px 8px;
+            font-size: 0.68rem;
+            font-family: var(--font-mono);
+            color: #ffffff;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .marker-card .num {
+            background: var(--accent-cyan);
+            color: #000;
+            font-weight: 800;
+            border-radius: 3px;
+            padding: 1px 4px;
+            font-size: 0.62rem;
+        }
+
+        .marker-arrow {
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 5px solid var(--accent-cyan);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Botão Flutuante para Restaurar Interface (caso esteja oculta) -->
+    <button id="btn-floating-show-hud" class="btn btn-primary interactive" title="Atalho: Tecla H">
+        👁️ Exibir Interface (H)
+    </button>
+
+    <!-- Overlay HUD Flutuante -->
+    <div class="hud-overlay" id="hud-overlay-root">
+
+        <!-- Barra Superior Slim -->
+        <header class="hud-header interactive">
+            <div class="header-brand">
+                <div class="brand-badge">SOLUÇÃO 2</div>
+                <div class="header-titles">
+                    <h1>MEDIÇÃO AZIMUTAL &bull; CÚPULA DE TELESCÓPIO</h1>
+                </div>
+            </div>
+            <div class="header-quick-actions">
+                <div class="badge-live">
+                    <span class="pulse-led"></span>
+                    <span id="telemetry-comm-status">Rt = 60</span>
+                </div>
+                <button class="btn-header-tool" id="btn-toggle-telemetry-hdr" title="Recolher/Expandir Telemetria (Atalho: T)">
+                    📊 Telemetria
+                </button>
+                <button class="btn-header-tool" id="btn-toggle-controls-hdr" title="Recolher/Expandir Controles (Atalho: C)">
+                    🎮 Controles
+                </button>
+                <button class="btn-header-tool" id="btn-toggle-hud" title="Modo Visualização Limpa (Atalho: H)">
+                    👁️ Ocultar HUD
+                </button>
+            </div>
+        </header>
+
+        <!-- Painel Esquerdo: Telemetria (Compacto e Minimizável) -->
+        <aside class="glass-panel panel-telemetry interactive" id="panel-telemetry">
+            <div class="panel-header-bar" id="handle-telemetry">
+                <div class="panel-header-title">
+                    <span>📊 Telemetria</span>
+                </div>
+                <div class="panel-header-actions">
+                    <button class="btn-panel-action" id="btn-min-telemetry" title="Minimizar / Expandir Painel">—</button>
+                </div>
+            </div>
+
+            <div class="telemetry-grid">
+                <!-- Azimuth Full Format -->
+                <div class="telemetry-card full-width">
+                    <span class="card-label">Azimute Cúpula (DMS)</span>
+                    <span class="card-value value-highlight-cyan" id="disp-dome-dms">000° 00' 00.0"</span>
+                    <span class="card-subtext" id="disp-dome-deg">Dec: 000.0000°</span>
+                </div>
+
+                <!-- Encoder Multiturn -->
+                <div class="telemetry-card">
+                    <span class="card-label">Voltas Pinhão</span>
+                    <span class="card-value value-highlight-orange" id="disp-turns">0.00</span>
+                    <span class="card-subtext">Multiturn</span>
+                </div>
+
+                <!-- Pinion Angular Position -->
+                <div class="telemetry-card">
+                    <span class="card-label">Ângulo Eixo</span>
+                    <span class="card-value" id="disp-pinion-angle">0.0°</span>
+                    <span class="card-subtext">0° a 360°</span>
+                </div>
+
+                <!-- Digital Code 12 bits -->
+                <div class="telemetry-card">
+                    <span class="card-label">Código 12-bit</span>
+                    <span class="card-value value-highlight-gold" id="disp-raw-code">0000</span>
+                    <span class="card-subtext">0 a 4095</span>
+                </div>
+
+                <!-- Theoretical System Resolution -->
+                <div class="telemetry-card">
+                    <span class="card-label">Resolução</span>
+                    <span class="card-value value-highlight-green">5.27"</span>
+                    <span class="card-subtext">245.760 passos</span>
+                </div>
+            </div>
+
+            <!-- Dynamic Spring Preload Status -->
+            <div class="section-header" style="margin-top: 4px;">
+                <h2>🌀 Mola & Guia Linear</h2>
+                <span class="section-tag">RUNOUT</span>
+            </div>
+
+            <div class="telemetry-grid">
+                <div class="telemetry-card">
+                    <span class="card-label">Deformação</span>
+                    <span class="card-value value-highlight-cyan" id="disp-spring-delta">0.00 mm</span>
+                    <span class="card-subtext" id="disp-carriage-x">X: 0.00 mm</span>
+                </div>
+                <div class="telemetry-card">
+                    <span class="card-label">Pré-Carga</span>
+                    <span class="card-value value-highlight-orange" id="disp-spring-force">35.0 N</span>
+                    <span class="card-subtext">k=4.5 N/mm</span>
+                </div>
+                <div class="telemetry-card full-width">
+                    <div class="control-label-row" style="margin-bottom: 2px;">
+                        <span class="card-label">Carga na Mola</span>
+                        <span class="card-subtext" id="disp-spring-pct">50%</span>
+                    </div>
+                    <div class="gauge-bar-container">
+                        <div class="gauge-fill" id="spring-gauge-fill" style="width: 50%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="font-size: 0.65rem; color: var(--text-dim); line-height: 1.4; font-family: var(--font-mono); background: rgba(0,0,0,0.3); padding: 5px 8px; border-radius: 4px; border-left: 2px solid var(--accent-cyan); margin-top: 2px;">
+                Z_c = 1200 &bull; Z_p = 20 &bull; Rt = 60.0 : 1<br>
+                1 Volta Cúpula = 60 Voltas Encoder
+            </div>
+        </aside>
+
+        <!-- Barra de Câmeras (Inferior Centro) -->
+        <div class="camera-toolbar interactive">
+            <div class="pill-dock">
+                <button class="btn btn-primary" id="btn-cam-iso" title="Vista Geral Isométrica">🌐 Geral</button>
+                <button class="btn" id="btn-cam-cad" title="Perfil Lateral Fiel ao CAD Solucao2.png">📐 Perfil CAD</button>
+                <button class="btn" id="btn-cam-gear" title="Engrenamento do Pinhão">⚙️ Engrenamento</button>
+                <button class="btn" id="btn-cam-spring" title="Mola e Guia Linear">🌀 Mola/Guia</button>
+                <button class="btn" id="btn-cam-dome" title="Vista da Cúpula">🔭 Cúpula</button>
+            </div>
+        </div>
+
+        <!-- Painel Direito: Controles de Operação (Compacto, Minimizável e Arrastável) -->
+        <aside class="glass-panel panel-controls interactive" id="panel-controls">
+            <div class="panel-header-bar" id="handle-controls" title="Clique e arraste para reposicionar na tela">
+                <div class="panel-header-title">
+                    <span style="opacity: 0.7; font-size: 0.7rem;">⠿</span>
+                    <span>🎮 Controles</span>
+                </div>
+                <div class="panel-header-actions">
+                    <button class="btn-panel-action" id="btn-min-controls" title="Minimizar / Expandir Painel">—</button>
+                </div>
+            </div>
+
+            <!-- Botões Principais de Controle -->
+            <div class="control-group">
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="btn-play-pause" style="flex: 1.2;">
+                        <span id="play-icon">⏸️</span> <span id="play-text">Pausar</span>
+                    </button>
+                    <button class="btn" id="btn-reverse-dir" title="Inverter Sentido de Rotação">
+                        <span id="dir-icon">🔄</span> Inverter
+                    </button>
+                    <button class="btn btn-danger" id="btn-reset-home" title="Zerar Azimute">
+                        🎯 Zero
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modos Rápidos -->
+            <div class="control-group">
+                <div class="btn-group">
+                    <button class="btn btn-active" id="btn-mode-slew" style="flex: 1;">
+                        🚀 Slew (4°/s)
+                    </button>
+                    <button class="btn" id="btn-mode-sidereal" style="flex: 1;">
+                        🌌 Sideral
+                    </button>
+                </div>
+            </div>
+
+            <!-- Slider de Velocidade -->
+            <div class="control-group">
+                <div class="control-label-row">
+                    <span>Velocidade Cúpula:</span>
+                    <span class="val" id="disp-speed-val">4.0 °/s</span>
+                </div>
+                <input type="range" id="slider-speed" min="0.1" max="15.0" step="0.1" value="4.0">
+            </div>
+
+            <!-- Slider Manual de Azimute -->
+            <div class="control-group">
+                <div class="control-label-row">
+                    <span>Azimute Manual:</span>
+                    <span class="val" id="disp-manual-val">0.00°</span>
+                </div>
+                <input type="range" id="slider-azimuth" min="0" max="360" step="0.05" value="0">
+            </div>
+
+            <!-- Slider de Excentricidade / Runout -->
+            <div class="section-header" style="margin-top: 3px;">
+                <h2>⚙️ Excentricidade / Runout</h2>
+            </div>
+
+            <div class="control-group">
+                <div class="control-label-row">
+                    <span>Imperfeição Radial:</span>
+                    <span class="val" id="disp-ecc-val">&plusmn;1.50 mm</span>
+                </div>
+                <input type="range" id="slider-eccentricity" min="0" max="3.0" step="0.1" value="1.5">
+            </div>
+
+            <!-- Vista Explodida -->
+            <div class="section-header" style="margin-top: 3px;">
+                <h2>🔍 Análise Explodida</h2>
+            </div>
+
+            <div class="control-group">
+                <button class="btn" id="btn-explode-view" style="width: 100%; padding: 6px; font-weight: 700;">
+                    💥 Vista Explodida: <span id="explode-state-text" style="color: var(--accent-orange); margin-left: 4px;">OFF</span>
+                </button>
+                <div class="control-label-row" id="explode-slider-container" style="display: none; margin-top: 3px;">
+                    <span>Fator:</span>
+                    <span class="val" id="disp-explode-val">0%</span>
+                </div>
+                <input type="range" id="slider-explode" min="0" max="100" step="1" value="0" style="display: none;">
+            </div>
+
+            <!-- Opções Visuais -->
+            <div class="section-header" style="margin-top: 3px;">
+                <h2>👁️ Visibilidade</h2>
+            </div>
+            <div class="btn-group">
+                <button class="btn" id="btn-toggle-dome" style="flex: 1;">🔭 Cúpula</button>
+                <button class="btn" id="btn-toggle-grid" style="flex: 1;">📐 Grade</button>
+            </div>
+
+            <div style="font-size: 0.62rem; color: var(--text-dim); text-align: center; margin-top: 2px;">
+                Arraste pelo topo para mover. Tecla H oculta o HUD.
+            </div>
+        </aside>
+    </div>
+
+    <!-- 3D Callout Annotations Container (projected onto screen) -->
+    <div id="annotations-container">
+        <!-- Will be populated dynamically for exploded view -->
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- JAVASCRIPT & THREE.JS IMPLEMENTATION                              -->
+    <!-- ================================================================= -->
+    <script>
+        // --- 1. CONFIGURAÇÕES GERAIS E ESTADO DO SISTEMA ---
+        const CONFIG = {
+            // Relações Cinemáticas
+            gearRatio: 60.0,            // Rt = 1200 / 20
+            pinionTeeth: 20,            // Z_p
+            rackTeethEquivalent: 1200,  // Z_c
+            encoderBitsSingleturn: 12,  // 4096 posições/volta
+            encoderCountsPerRev: 4096,
+            totalSystemCounts: 4096 * 60, // 245.760 passos teóricos
+
+            // Dinâmica e Mola
+            springFreeLength: 65,       // mm em escala visual
+            springNominalWorkingLen: 50,// mm
+            springStiffness: 4.5,       // N/mm
+            springPreloadNominal: 35.0, // N
+            springRadius: 7.5,
+            springWireRadius: 1.1,
+            springCoils: 7.5,
+
+            // Dimensões Mecânicas (em unidades 3D ~ mm equivalentes)
+            pinionPitchRadius: 20.0,    // Módulo 2 -> Dp = 40 mm, Rp = 20 mm
+            rackPitchRadius: 180.0,     // Raio da cremalheira curvada na cena para excelente proporção visual
+            baseLength: 160.0,
+            baseWidth: 70.0,
+            baseThickness: 12.0,
+            railLength: 140.0,
+            railWidth: 15.0,
+            railHeight: 8.0,
+            carriageLength: 46.0,
+            carriageWidth: 34.0,
+            carriageHeight: 14.0,
+            encoderDiameter: 44.0,
+            encoderHeight: 38.0,
+            couplingDiameter: 26.0,
+            couplingHeight: 28.0,
+            shaftDiameter: 10.0,
+            shaftTotalLength: 85.0
+        };
+
+        // Estado Dinâmico
+        const STATE = {
+            domeAzimuth: 0.0,           // Graus (0 - 360)
+            domeSpeed: 4.0,             // Graus/segundo
+            direction: 1.0,             // 1: Horário, -1: Anti-horário
+            isRunning: true,            // Play/Pause
+            isManual: false,            // Ajuste manual no slider
+            mode: 'slew',               // 'slew' ou 'sidereal'
+            eccentricity: 1.5,          // mm de runout
+            eccentricityFreq: 1.0,      // ciclos por volta
+            carriageXOffset: 0.0,       // Deslocamento dinâmico do patim em X
+            currentSpringForce: 35.0,
+            currentSpringDelta: 0.0,
+            calibrationOffset: 0.0,     // Offset de calibração home
+            isExploded: false,
+            explodeProgress: 0.0,       // 0 a 1
+            showDome: true,
+            showGrid: true
+        };
+
+        // --- 2. INICIALIZAÇÃO DA CENA THREE.JS ---
+        const canvas = document.getElementById('webgl-canvas');
+        const renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true,
+            powerPreference: "high-performance",
+            alpha: false
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+        if (renderer.outputEncoding !== undefined) {
+            renderer.outputEncoding = THREE.sRGBEncoding;
+        }
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x060913);
+        scene.fog = new THREE.FogExp2(0x060913, 0.0018);
+
+        const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 1, 3000);
+        camera.position.set(160, 140, 220);
+
+        const controls = new THREE.OrbitControls(camera, canvas);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.maxDistance = 1200;
+        controls.minDistance = 30;
+        controls.maxPolarAngle = Math.PI / 2 + 0.08; // Não deixar passar muito abaixo do piso
+        controls.target.set(0, 45, 0);
+
+        // --- 3. ILUMINAÇÃO DE ESTÚDIO TÉCNICO / OBSERVATÓRIO ---
+        const ambientLight = new THREE.AmbientLight(0xd8e4f0, 0.65);
+        scene.add(ambientLight);
+
+        // Luz Direcional Principal (Key Light com Sombras Nítidas)
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.25);
+        keyLight.position.set(180, 260, 150);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 2048;
+        keyLight.shadow.mapSize.height = 2048;
+        keyLight.shadow.camera.near = 10;
+        keyLight.shadow.camera.far = 700;
+        keyLight.shadow.camera.left = -160;
+        keyLight.shadow.camera.right = 160;
+        keyLight.shadow.camera.top = 160;
+        keyLight.shadow.camera.bottom = -160;
+        keyLight.shadow.bias = -0.0004;
+        scene.add(keyLight);
+
+        // Fill Light Fria (Azulada)
+        const fillLight = new THREE.DirectionalLight(0x4080ff, 0.65);
+        fillLight.position.set(-180, 120, -120);
+        scene.add(fillLight);
+
+        // Rim Light Suave (Laranja / Quente para destacar arestas usinadas)
+        const rimLight = new THREE.DirectionalLight(0xffa550, 0.55);
+        rimLight.position.set(0, -50, -200);
+        scene.add(rimLight);
+
+        // Luz Pontual Ciano Técnica no Engrenamento
+        const gearSpot = new THREE.PointLight(0x00f0ff, 0.8, 150);
+        gearSpot.position.set(-20, 95, 0);
+        scene.add(gearSpot);
+
+        // --- 4. MATERIAIS PBR DE ENGENHARIA MECÂNICA ---
+        const MATS = {
+            // Aço usinado polido (eixo, pinhão, rolamentos)
+            polishedSteel: new THREE.MeshStandardMaterial({
+                color: 0xd2d7df,
+                metalness: 0.92,
+                roughness: 0.18
+            }),
+            // Aço inoxidável escovado (base metálica, réguas)
+            brushedSteel: new THREE.MeshStandardMaterial({
+                color: 0x8a929e,
+                metalness: 0.85,
+                roughness: 0.32
+            }),
+            // Trilho linear temperado e retificado (MGN15)
+            linearRailSteel: new THREE.MeshStandardMaterial({
+                color: 0xbfc6d1,
+                metalness: 0.95,
+                roughness: 0.12
+            }),
+            // Patim móvel (aço escurecido/anodizado)
+            carriageBody: new THREE.MeshStandardMaterial({
+                color: 0x4a515e,
+                metalness: 0.82,
+                roughness: 0.28
+            }),
+            // Vedadores verdes industriais do patim (end-seals MGN)
+            carriageSealsGreen: new THREE.MeshStandardMaterial({
+                color: 0x059669,
+                metalness: 0.15,
+                roughness: 0.4
+            }),
+            // Alumínio anodizado prateado (acoplamento Oldham)
+            aluminumOldham: new THREE.MeshStandardMaterial({
+                color: 0xe0e5ec,
+                metalness: 0.88,
+                roughness: 0.22
+            }),
+            // Cruzeta de polímero técnico / acetal preto do acoplamento
+            oldhamDisc: new THREE.MeshStandardMaterial({
+                color: 0x1e2229,
+                metalness: 0.1,
+                roughness: 0.5
+            }),
+            // Carcaça do Encoder Industrial (cinza grafite escuro com textura usinada)
+            encoderHousing: new THREE.MeshStandardMaterial({
+                color: 0x242a35,
+                metalness: 0.75,
+                roughness: 0.3
+            }),
+            // Flange do Encoder (aço retificado)
+            encoderFlange: new THREE.MeshStandardMaterial({
+                color: 0xa8b0bc,
+                metalness: 0.9,
+                roughness: 0.2
+            }),
+            // Conector elétrico M12 / buchas de latão dourado
+            brass: new THREE.MeshStandardMaterial({
+                color: 0xd4af37,
+                metalness: 0.85,
+                roughness: 0.25
+            }),
+            // Parafusos Allen de alta resistência (aço negro)
+            blackBolt: new THREE.MeshStandardMaterial({
+                color: 0x181a1f,
+                metalness: 0.7,
+                roughness: 0.4
+            }),
+            // Mola helicoidal de aço mola fosfatizado brilhante
+            springSteel: new THREE.MeshStandardMaterial({
+                color: 0xc8d0dc,
+                metalness: 0.94,
+                roughness: 0.15
+            }),
+            // Cremalheira circular da cúpula (aço carbono usinado)
+            domeRackSteel: new THREE.MeshStandardMaterial({
+                color: 0x76808f,
+                metalness: 0.88,
+                roughness: 0.28
+            }),
+            // Estrutura do piso do observatório / anel base
+            observatoryFloor: new THREE.MeshStandardMaterial({
+                color: 0x0f1523,
+                metalness: 0.3,
+                roughness: 0.8
+            }),
+            // Cúpula Translúcida do Telescópio (vidro/alumínio aeroespacial estilizado)
+            domeGlass: new THREE.MeshPhysicalMaterial({
+                color: 0x00d4ff,
+                metalness: 0.2,
+                roughness: 0.1,
+                transmission: 0.75,
+                transparent: true,
+                opacity: 0.35,
+                ior: 1.4,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.1,
+                depthWrite: false
+            }),
+            domeRibs: new THREE.MeshStandardMaterial({
+                color: 0x1e2b45,
+                metalness: 0.8,
+                roughness: 0.25
+            }),
+            domeSlitShutter: new THREE.MeshStandardMaterial({
+                color: 0x2a3854,
+                metalness: 0.7,
+                roughness: 0.3
+            })
+        };
+
+        // --- 5. CRIAÇÃO DO AMBIENTE (PISO E ESTRELAS) ---
+        // Piso do Observatório com anéis concêntricos
+        const floorGeo = new THREE.CylinderGeometry(420, 420, 4, 64);
+        const floorMesh = new THREE.Mesh(floorGeo, MATS.observatoryFloor);
+        floorMesh.position.set(120, -2, 0);
+        floorMesh.receiveShadow = true;
+        scene.add(floorMesh);
+
+        // Grade circular de alinhamento astronômico
+        const gridHelper = new THREE.PolarGridHelper(400, 16, 8, 64, 0x00f0ff, 0x162540);
+        gridHelper.position.set(120, 0.1, 0);
+        scene.add(gridHelper);
+
+        // Campo Estelar de Fundo (Partículas)
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 1400;
+        const starPositions = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount * 3; i += 3) {
+            const r = 900 + Math.random() * 800;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            starPositions[i] = r * Math.sin(phi) * Math.cos(theta);
+            starPositions[i+1] = Math.abs(r * Math.cos(phi)) + 50; // Hemisfério celeste superior
+            starPositions[i+2] = r * Math.sin(phi) * Math.sin(theta);
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starMat = new THREE.PointsMaterial({ color: 0x99ccff, size: 2.2, transparent: true, opacity: 0.85 });
+        const starField = new THREE.Points(starGeo, starMat);
+        scene.add(starField);
+
+        // --- 6. MODELAGEM PROCEDURAL DOS ELEMENTOS MECÂNICOS ---
+
+        // Grupos Hierárquicos
+        const rootAssembly = new THREE.Group();
+        scene.add(rootAssembly);
+
+        // Grupo da Base Fixa (não se move com o runout)
+        const baseGroup = new THREE.Group();
+        rootAssembly.add(baseGroup);
+
+        // Grupo do Carro Móvel (Patim + Encoder + Mola Contato + Eixo + Pinhão)
+        // Este conjunto tem liberdade de translação no eixo X (radial)
+        const carriageAssembly = new THREE.Group();
+        rootAssembly.add(carriageAssembly);
+
+        // Subgrupo rotativo: Eixo + Pinhão + Acoplamento Superior
+        const rotatingPinionAssembly = new THREE.Group();
+
+        // Subgrupo rotativo: Eixo do Encoder + Acoplamento Inferior
+        const rotatingEncoderShaft = new THREE.Group();
+
+        // --- 6.1. BASE FIXA METÁLICA (Fiel ao CAD Solucao2.png) ---
+        // Placa retangular espessa com cantos arredondados, posicionada no interior da cúpula
+        const baseShape = new THREE.Shape();
+        const xMin = -28.0;
+        const xMax = 82.0;
+        const bh = CONFIG.baseWidth / 2;  // 35
+        const cr = 6.0; // raio dos cantos
+        baseShape.moveTo(xMin + cr, -bh);
+        baseShape.lineTo(xMax - cr, -bh);
+        baseShape.quadraticCurveTo(xMax, -bh, xMax, -bh + cr);
+        baseShape.lineTo(xMax, bh - cr);
+        baseShape.quadraticCurveTo(xMax, bh, xMax - cr, bh);
+        baseShape.lineTo(xMin + cr, bh);
+        baseShape.quadraticCurveTo(xMin, bh, xMin, bh - cr);
+        baseShape.lineTo(xMin, -bh + cr);
+        baseShape.quadraticCurveTo(xMin, -bh, xMin + cr, -bh);
+
+        const baseExtrudeSettings = {
+            depth: CONFIG.baseThickness,
+            bevelEnabled: true,
+            bevelSegments: 3,
+            steps: 1,
+            bevelSize: 1.5,
+            bevelThickness: 1.5
+        };
+        const baseGeo = new THREE.ExtrudeGeometry(baseShape, baseExtrudeSettings);
+        baseGeo.rotateX(Math.PI / 2); // Deitar no plano XZ
+        const baseMesh = new THREE.Mesh(baseGeo, MATS.brushedSteel);
+        baseMesh.position.set(0, CONFIG.baseThickness, 0);
+        baseMesh.castShadow = true;
+        baseMesh.receiveShadow = true;
+        baseGroup.add(baseMesh);
+
+        // Furos de fixação da base (4 cantos) com parafusos Allen
+        const boltPositions = [
+            [xMin + 10, -bh + 10],
+            [xMax - 10, -bh + 10],
+            [xMin + 10,  bh - 10],
+            [xMax - 10,  bh - 10]
+        ];
+        boltPositions.forEach(([bx, bz]) => {
+            const boltHead = new THREE.Mesh(
+                new THREE.CylinderGeometry(3.5, 3.5, 4, 16),
+                MATS.blackBolt
+            );
+            boltHead.position.set(bx, CONFIG.baseThickness + 2, bz);
+            boltHead.castShadow = true;
+            baseGroup.add(boltHead);
+
+            // Sextavado interno do Allen
+            const allenHole = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.8, 1.8, 2.2, 6),
+                MATS.carriageBody
+            );
+            allenHole.position.set(bx, CONFIG.baseThickness + 3.2, bz);
+            baseGroup.add(allenHole);
+        });
+
+        // Suporte Vertical Fixo (Batente da Mola à direita, exatamente como no CAD Solucao2.png)
+        // Posicionado na extremidade positiva de X
+        const springStopX = xMax - 4; // ~78 mm
+        const stopWidth = 26;
+        const stopHeight = 32;
+        const stopThick = 8;
+        const springStopGeo = new THREE.BoxGeometry(stopThick, stopHeight, stopWidth);
+        const springStopMesh = new THREE.Mesh(springStopGeo, MATS.brushedSteel);
+        springStopMesh.position.set(springStopX - stopThick/2, CONFIG.baseThickness + stopHeight/2, 0);
+        springStopMesh.castShadow = true;
+        springStopMesh.receiveShadow = true;
+        baseGroup.add(springStopMesh);
+
+        // Pino central / guia de encaixe da mola no batente
+        const springSpigotGeo = new THREE.CylinderGeometry(CONFIG.springRadius * 0.75, CONFIG.springRadius * 0.75, 8, 24);
+        springSpigotGeo.rotateZ(Math.PI / 2);
+        const springSpigotMesh = new THREE.Mesh(springSpigotGeo, MATS.polishedSteel);
+        springSpigotMesh.position.set(springStopX - stopThick - 4, CONFIG.baseThickness + 14, 0);
+        baseGroup.add(springSpigotMesh);
+
+        // Parafusos de fixação do batente na base
+        const stopBolt1 = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 6, 12), MATS.blackBolt);
+        stopBolt1.position.set(springStopX - stopThick/2, CONFIG.baseThickness + stopHeight + 1, -8);
+        baseGroup.add(stopBolt1);
+        const stopBolt2 = stopBolt1.clone();
+        stopBolt2.position.z = 8;
+        baseGroup.add(stopBolt2);
+
+        // --- 6.2. TRILHO DE GUIA LINEAR MGN15 (Fixo na Base) ---
+        // Perfil usinado em aço retificado com ranhuras em V
+        const railLength = 100.0;
+        const railGeo = new THREE.BoxGeometry(railLength, CONFIG.railHeight, CONFIG.railWidth);
+        const railMesh = new THREE.Mesh(railGeo, MATS.linearRailSteel);
+        const railY = CONFIG.baseThickness + CONFIG.railHeight / 2;
+        const railCenterX = (xMin + 4 + springStopX - 8) / 2; // ~23 mm
+        railMesh.position.set(railCenterX, railY, 0);
+        railMesh.castShadow = true;
+        railMesh.receiveShadow = true;
+        baseGroup.add(railMesh);
+
+        // Canaletas laterais retificadas (v-grooves) para esferas do patim
+        const grooveGeo = new THREE.BoxGeometry(railLength, 1.8, 1.2);
+        const grooveMat = new THREE.MeshStandardMaterial({ color: 0x4a5568, metalness: 0.9, roughness: 0.4 });
+        const grooveFront = new THREE.Mesh(grooveGeo, grooveMat);
+        grooveFront.position.set(railCenterX, railY, CONFIG.railWidth/2);
+        baseGroup.add(grooveFront);
+        const grooveBack = grooveFront.clone();
+        grooveBack.position.z = -CONFIG.railWidth/2;
+        baseGroup.add(grooveBack);
+
+        // Furos de fixação ao longo do trilho MGN
+        for (let rx = railCenterX - railLength/2 + 10; rx <= railCenterX + railLength/2 - 10; rx += 20) {
+            const railBolt = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 2, 12), MATS.blackBolt);
+            railBolt.position.set(rx, railY + CONFIG.railHeight/2, 0);
+            baseGroup.add(railBolt);
+        }
+
+        // --- 6.3. PATIM MÓVEL / CARRO DESLIZANTE (Carriage MGN15) ---
+        // Montado sobre o trilho linear com liberdade de translação em X
+        const carriageY = railY + CONFIG.railHeight/2 + CONFIG.carriageHeight/2;
+        const carriageBodyGeo = new THREE.BoxGeometry(CONFIG.carriageLength, CONFIG.carriageHeight, CONFIG.carriageWidth);
+        const carriageBodyMesh = new THREE.Mesh(carriageBodyGeo, MATS.carriageBody);
+        carriageBodyMesh.position.set(0, carriageY, 0);
+        carriageBodyMesh.castShadow = true;
+        carriageBodyMesh.receiveShadow = true;
+        carriageAssembly.add(carriageBodyMesh);
+
+        // Vedadores laterais verdes (End-Seals característicos de guias industriais)
+        const sealThick = 3.2;
+        const sealGeo = new THREE.BoxGeometry(sealThick, CONFIG.carriageHeight + 0.4, CONFIG.carriageWidth + 0.4);
+        const sealLeft = new THREE.Mesh(sealGeo, MATS.carriageSealsGreen);
+        sealLeft.position.set(-CONFIG.carriageLength/2 - sealThick/2, carriageY, 0);
+        carriageAssembly.add(sealLeft);
+
+        const sealRight = new THREE.Mesh(sealGeo, MATS.carriageSealsGreen);
+        sealRight.position.set(CONFIG.carriageLength/2 + sealThick/2, carriageY, 0);
+        carriageAssembly.add(sealRight);
+
+        // Bico de graxa / engraxadeiro de latão no patim
+        const greaseNipple = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.5, 1.2, 5, 12),
+            MATS.brass
+        );
+        greaseNipple.rotation.z = Math.PI / 2;
+        greaseNipple.position.set(-CONFIG.carriageLength/2 - 4.5, carriageY, 8);
+        carriageAssembly.add(greaseNipple);
+
+        // Suporte / Placa de encosto da Mola solidária ao Carro Móvel (Lado direito do patim)
+        const carriageStopThick = 7.0;
+        const carriageStopHeight = 28.0;
+        const carriageStopWidth = 24.0;
+        const carriageStopX = CONFIG.carriageLength / 2 + sealThick + carriageStopThick / 2; // ~28 mm
+        const carriageStopMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(carriageStopThick, carriageStopHeight, carriageStopWidth),
+            MATS.brushedSteel
+        );
+        carriageStopMesh.position.set(carriageStopX, carriageY + (carriageStopHeight - CONFIG.carriageHeight)/2, 0);
+        carriageStopMesh.castShadow = true;
+        carriageAssembly.add(carriageStopMesh);
+
+        // Pino guia da mola no carro móvel
+        const carriageSpigotGeo = new THREE.CylinderGeometry(CONFIG.springRadius * 0.75, CONFIG.springRadius * 0.75, 8, 24);
+        carriageSpigotGeo.rotateZ(-Math.PI / 2);
+        const carriageSpigotMesh = new THREE.Mesh(carriageSpigotGeo, MATS.polishedSteel);
+        carriageSpigotMesh.position.set(carriageStopX + carriageStopThick/2 + 4, CONFIG.baseThickness + 14, 0);
+        carriageAssembly.add(carriageSpigotMesh);
+
+        // --- 6.4. MECANISMO DE MOLA HELICOIDAL DINÂMICA (Procedural 3D) ---
+        // Criaremos um objeto de malha dinâmico cuja geometria é atualizada a cada frame
+        // A mola fica entre o carriageStop (à esquerda, que se move em X) e o springStop (à direita, fixo)
+        let springMesh;
+        const springAnchorRightX = springStopX - stopThick; // Ponto fixo direito da mola
+
+        function createSpringGeometry(startX, endX, radius, coils, wireRadius) {
+            const length = endX - startX;
+            const pointsCount = 200;
+            const curvePoints = [];
+            
+            for (let i = 0; i <= pointsCount; i++) {
+                const t = i / pointsCount;
+                const x = startX + t * length;
+                
+                // Suavização das extremidades para espiras planas de encosto
+                let coilAngle = t * Math.PI * 2 * coils;
+                let currentRadius = radius;
+                
+                // Redução de passo nas pontas (closed & ground ends)
+                if (t < 0.08) {
+                    coilAngle = (t / 0.08) * Math.PI * 0.8;
+                } else if (t > 0.92) {
+                    coilAngle = (coils * Math.PI * 2) - ((1 - t) / 0.08) * Math.PI * 0.8;
+                }
+
+                const y = Math.cos(coilAngle) * currentRadius;
+                const z = Math.sin(coilAngle) * currentRadius;
+                curvePoints.push(new THREE.Vector3(x, y, z));
+            }
+
+            const path = new THREE.CatmullRomCurve3(curvePoints);
+            const tubeGeo = new THREE.TubeGeometry(path, 160, wireRadius, 10, false);
+            return tubeGeo;
+        }
+
+        // Criar a malha inicial da mola
+        const initialSpringStartX = carriageStopX + carriageStopThick/2;
+        const initialSpringGeo = createSpringGeometry(
+            initialSpringStartX,
+            springAnchorRightX,
+            CONFIG.springRadius,
+            CONFIG.springCoils,
+            CONFIG.springWireRadius
+        );
+        springMesh = new THREE.Mesh(initialSpringGeo, MATS.springSteel);
+        springMesh.position.y = CONFIG.baseThickness + 14;
+        springMesh.castShadow = true;
+        baseGroup.add(springMesh); // Adicionada à baseGroup, seus pontos serão atualizados dinamicamente
+
+        // Função de atualização em tempo real da mola
+        function updateSpringGeometry(currentCarriageX) {
+            const startX = currentCarriageX + carriageStopX + carriageStopThick/2;
+            const endX = springAnchorRightX;
+            const newGeo = createSpringGeometry(
+                startX,
+                endX,
+                CONFIG.springRadius,
+                CONFIG.springCoils,
+                CONFIG.springWireRadius
+            );
+            springMesh.geometry.dispose();
+            springMesh.geometry = newGeo;
+        }
+
+        // --- 6.5. ENCODER ABSOLUTO MULTIVOLTAS (Montado sobre o Patim) ---
+        // Bloco adaptador / flange quadrado de fixação com 4 parafusos allen nos cantos (exatamente como em Solucao2.png)
+        const encoderBaseY = carriageY + CONFIG.carriageHeight / 2;
+        const encoderFlangeThick = 6.0;
+        const encoderFlangeSize = 34.0;
+        const encoderFlangeGeo = new THREE.BoxGeometry(encoderFlangeSize, encoderFlangeThick, encoderFlangeSize);
+        const encoderFlangeMesh = new THREE.Mesh(encoderFlangeGeo, MATS.encoderFlange);
+        encoderFlangeMesh.position.set(0, encoderBaseY + encoderFlangeThick/2, 0);
+        encoderFlangeMesh.castShadow = true;
+        carriageAssembly.add(encoderFlangeMesh);
+
+        // 4 Parafusos Allen na face frontal/superior do encoder (visíveis no CAD)
+        const encBoltDist = 12.0;
+        [
+            [-encBoltDist, -encBoltDist],
+            [ encBoltDist, -encBoltDist],
+            [-encBoltDist,  encBoltDist],
+            [ encBoltDist,  encBoltDist]
+        ].forEach(([ex, ez]) => {
+            const eBolt = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 2, 10), MATS.blackBolt);
+            eBolt.position.set(ex, encoderBaseY + encoderFlangeThick + 0.8, ez);
+            carriageAssembly.add(eBolt);
+        });
+
+        // Corpo cilíndrico principal do Encoder Industrial
+        const encoderBodyY = encoderBaseY + encoderFlangeThick + CONFIG.encoderHeight / 2;
+        const encoderBodyGeo = new THREE.CylinderGeometry(CONFIG.encoderDiameter/2, CONFIG.encoderDiameter/2, CONFIG.encoderHeight, 32);
+        const encoderBodyMesh = new THREE.Mesh(encoderBodyGeo, MATS.encoderHousing);
+        encoderBodyMesh.position.set(0, encoderBodyY, 0);
+        encoderBodyMesh.castShadow = true;
+        carriageAssembly.add(encoderBodyMesh);
+
+        // Faixa de etiqueta técnica com detalhes industriais
+        const labelGeo = new THREE.CylinderGeometry(CONFIG.encoderDiameter/2 + 0.1, CONFIG.encoderDiameter/2 + 0.1, 14, 32, 1, true);
+        const labelMat = new THREE.MeshStandardMaterial({
+            color: 0x1e2633,
+            metalness: 0.3,
+            roughness: 0.6
+        });
+        const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+        labelMesh.position.set(0, encoderBodyY, 0);
+        carriageAssembly.add(labelMesh);
+
+        // Conector Traseiro M12 Industrial e Cabo Elétrico Flexível para o PLC
+        const m12Base = new THREE.Mesh(
+            new THREE.CylinderGeometry(4.5, 4.5, 8, 16),
+            MATS.brass
+        );
+        m12Base.rotation.x = Math.PI / 2;
+        m12Base.position.set(0, encoderBodyY - 4, -CONFIG.encoderDiameter/2 - 4);
+        carriageAssembly.add(m12Base);
+
+        // Porca serrilhada do conector
+        const m12Nut = new THREE.Mesh(
+            new THREE.CylinderGeometry(5.2, 5.2, 5, 8),
+            MATS.blackBolt
+        );
+        m12Nut.rotation.x = Math.PI / 2;
+        m12Nut.position.set(0, encoderBodyY - 4, -CONFIG.encoderDiameter/2 - 8);
+        carriageAssembly.add(m12Nut);
+
+        // Cabo elétrico flexível curvado saindo em direção ao painel
+        const cableCurve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0, encoderBodyY - 4, -CONFIG.encoderDiameter/2 - 10),
+            new THREE.Vector3(0, encoderBodyY - 12, -CONFIG.encoderDiameter/2 - 25),
+            new THREE.Vector3(15, CONFIG.baseThickness + 10, -50),
+            new THREE.Vector3(40, CONFIG.baseThickness + 5, -80)
+        ]);
+        const cableGeo = new THREE.TubeGeometry(cableCurve, 40, 2.5, 12, false);
+        const cableMat = new THREE.MeshStandardMaterial({ color: 0x181a1f, roughness: 0.7, metalness: 0.1 });
+        const cableMesh = new THREE.Mesh(cableGeo, cableMat);
+        cableMesh.castShadow = true;
+        carriageAssembly.add(cableMesh);
+
+        // Colarinho de saída do eixo do encoder com retentor
+        const collarY = encoderBodyY + CONFIG.encoderHeight/2 + 3; // y = 81
+        const collarMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(11, 12, 6, 24),
+            MATS.encoderFlange
+        );
+        collarMesh.position.set(0, collarY, 0);
+        carriageAssembly.add(collarMesh);
+
+        // --- 6.5.1. EIXO DE SAÍDA DO ENCODER (Conexão Inferior ao Acoplamento) ---
+        // Eixo retificado que sai do encoder e entra no cubo inferior do acoplamento Oldham
+        const encShaftBottom = collarY + 3; // y = 84
+        const encShaftTop = 102;           // y = 102 (penetra 2mm no cubo inferior)
+        const encShaftHeight = encShaftTop - encShaftBottom; // 18 mm
+        const encShaftGeo = new THREE.CylinderGeometry(CONFIG.shaftDiameter/2, CONFIG.shaftDiameter/2, encShaftHeight, 32);
+        const encShaftMesh = new THREE.Mesh(encShaftGeo, MATS.polishedSteel);
+        encShaftMesh.position.set(0, encShaftBottom + encShaftHeight/2, 0); // y = 93
+        encShaftMesh.castShadow = true;
+        rotatingEncoderShaft.add(encShaftMesh);
+
+        // --- 6.6. ACOPLAMENTO DE JUNTA OLDHAM (Fiel a Solucao2.png) ---
+        // Posicionado exatamente entre o eixo do encoder (abaixo) e o eixo do pinhão (acima)
+        // Composto por: Cubo Inferior de Alumínio, Disco/Cruzeta Central de Poliacetal e Cubo Superior de Alumínio
+        const couplingCenterY = 114.0; // Ponto médio do acoplamento
+        const couplingGroup = new THREE.Group();
+        couplingGroup.position.set(0, couplingCenterY, 0);
+        carriageAssembly.add(couplingGroup);
+
+        const hubHeight = 11.5;
+        const discHeight = 4.0;
+        const cDiam = 28.0;
+
+        // 1. Cubo Inferior do Oldham (Cilíndrico usinado, ranhuras e furos transversais)
+        const lowerHubGeo = new THREE.CylinderGeometry(cDiam/2, cDiam/2, hubHeight, 32);
+        const lowerHubMesh = new THREE.Mesh(lowerHubGeo, MATS.aluminumOldham);
+        lowerHubMesh.position.set(0, -hubHeight/2 - discHeight/2, 0); // y = -7.75 local
+        lowerHubMesh.castShadow = true;
+        couplingGroup.add(lowerHubMesh);
+
+        // Rasgo / fenda de aperto no cubo inferior
+        const slotCutMat = new THREE.MeshStandardMaterial({ color: 0x1a202c, metalness: 0.8, roughness: 0.5 });
+        const slotCut1 = new THREE.Mesh(new THREE.BoxGeometry(2, hubHeight - 1, cDiam/2 + 2), slotCutMat);
+        slotCut1.position.set(0, -hubHeight/2 - discHeight/2, cDiam/4);
+        couplingGroup.add(slotCut1);
+
+        // 2 Parafusos Allen de travamento no cubo inferior
+        const clampBolt1 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 11, 12), MATS.blackBolt);
+        clampBolt1.rotation.z = Math.PI / 2;
+        clampBolt1.position.set(0, -hubHeight/2 - discHeight/2 - 2, cDiam/2 - 3.5);
+        couplingGroup.add(clampBolt1);
+
+        const clampBolt2 = clampBolt1.clone();
+        clampBolt2.position.y += 4;
+        couplingGroup.add(clampBolt2);
+
+        // 2. Cruzeta / Disco Central Autolubrificante com línguas ortogonais
+        const centerDiscGeo = new THREE.CylinderGeometry(cDiam/2 + 0.3, cDiam/2 + 0.3, discHeight, 32);
+        const centerDiscMesh = new THREE.Mesh(centerDiscGeo, MATS.oldhamDisc);
+        centerDiscMesh.position.set(0, 0, 0); // y = 0 local (y = 114 mundo)
+        centerDiscMesh.castShadow = true;
+        couplingGroup.add(centerDiscMesh);
+
+        // Língua/entalhe inferior da cruzeta (encaixa no cubo inferior)
+        const tongueLower = new THREE.Mesh(new THREE.BoxGeometry(cDiam * 0.9, 2.5, 4.5), MATS.oldhamDisc);
+        tongueLower.position.set(0, -discHeight/2 - 1.25, 0);
+        couplingGroup.add(tongueLower);
+
+        // Língua/entalhe superior da cruzeta (perpendicular, encaixa no cubo superior)
+        const tongueUpper = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.5, cDiam * 0.9), MATS.oldhamDisc);
+        tongueUpper.position.set(0, discHeight/2 + 1.25, 0);
+        couplingGroup.add(tongueUpper);
+
+        // 3. Cubo Superior do Oldham
+        const upperHubGeo = new THREE.CylinderGeometry(cDiam/2, cDiam/2, hubHeight, 32);
+        const upperHubMesh = new THREE.Mesh(upperHubGeo, MATS.aluminumOldham);
+        upperHubMesh.position.set(0, hubHeight/2 + discHeight/2, 0); // y = +7.75 local
+        upperHubMesh.castShadow = true;
+        couplingGroup.add(upperHubMesh);
+
+        // Rasgo no cubo superior
+        const slotCut2 = new THREE.Mesh(new THREE.BoxGeometry(cDiam/2 + 2, hubHeight - 1, 2), slotCutMat);
+        slotCut2.position.set(cDiam/4, hubHeight/2 + discHeight/2, 0);
+        couplingGroup.add(slotCut2);
+
+        // 2 Parafusos Allen no cubo superior
+        const clampBolt3 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 11, 12), MATS.blackBolt);
+        clampBolt3.rotation.x = Math.PI / 2;
+        clampBolt3.position.set(cDiam/2 - 3.5, hubHeight/2 + discHeight/2 - 2, 0);
+        couplingGroup.add(clampBolt3);
+
+        const clampBolt4 = clampBolt3.clone();
+        clampBolt4.position.y += 4;
+        couplingGroup.add(clampBolt4);
+
+        // --- 6.7. EIXO VERTICAL DO PINHÃO (Contínuo do Acoplamento ao Pinhão) ---
+        // Sai diretamente do topo do cubo superior do Oldham (y = 125.5) e sobe ininterruptamente até o topo do pinhão
+        const pinionFaceWidth = 14.0;
+        const pinionY = 172.0; // Altura precisa para engrenamento com a cremalheira
+        const shaftBottomY = couplingCenterY + hubHeight/2 + discHeight/2; // y = 125.5
+        const shaftTopY = pinionY + pinionFaceWidth/2 + 10;                // y = 189.0
+        const shaftTotalLength = shaftTopY - shaftBottomY;                 // 63.5 mm
+
+        const shaftGeo = new THREE.CylinderGeometry(CONFIG.shaftDiameter/2, CONFIG.shaftDiameter/2, shaftTotalLength, 32);
+        const shaftMesh = new THREE.Mesh(shaftGeo, MATS.polishedSteel);
+        shaftMesh.position.set(0, shaftBottomY + shaftTotalLength / 2, 0); // Perfeitamente centrado e contínuo
+        shaftMesh.castShadow = true;
+        rotatingPinionAssembly.add(shaftMesh);
+
+        // Colar de ajuste fino em latão sob o pinhão (conforme mecânica de precisão)
+        const shaftRing = new THREE.Mesh(new THREE.CylinderGeometry(7.0, 7.0, 3.5, 24), MATS.brass);
+        shaftRing.position.set(0, pinionY - pinionFaceWidth/2 - 2, 0);
+        rotatingPinionAssembly.add(shaftRing);
+
+        // --- 6.8. PINHÃO LEITOR (Z_p = 20 dentes, Módulo 2) ---
+        // Dp = 40 mm (Raio = 20 mm). Dentes retos 3D bem definidos!
+        function createSpurGearGeometry(teeth, module, faceWidth, hubRadius, boreRadius) {
+            const pitchRadius = (module * teeth) / 2; // 20 mm
+            const addendum = module;                   // 2 mm
+            const dedendum = 1.25 * module;            // 2.5 mm
+            const outerRadius = pitchRadius + addendum;// 22 mm
+            const rootRadius = pitchRadius - dedendum; // 17.5 mm
+
+            const shape = new THREE.Shape();
+            const numPointsPerTooth = 6;
+            const totalSteps = teeth * numPointsPerTooth;
+
+            for (let i = 0; i <= totalSteps; i++) {
+                const toothIndex = Math.floor(i / numPointsPerTooth);
+                const step = i % numPointsPerTooth;
+                const baseAngle = (toothIndex / teeth) * Math.PI * 2;
+                const toothFraction = (Math.PI * 2) / teeth;
+
+                let r, a;
+                switch (step) {
+                    case 0: // Raiz antes do flanco
+                        r = rootRadius;
+                        a = baseAngle;
+                        break;
+                    case 1: // Início do flanco ativo
+                        r = pitchRadius - 0.4;
+                        a = baseAngle + toothFraction * 0.18;
+                        break;
+                    case 2: // Topo do dente (canto esquerdo)
+                        r = outerRadius;
+                        a = baseAngle + toothFraction * 0.30;
+                        break;
+                    case 3: // Topo do dente (canto direito)
+                        r = outerRadius;
+                        a = baseAngle + toothFraction * 0.50;
+                        break;
+                    case 4: // Flanco descendente
+                        r = pitchRadius - 0.4;
+                        a = baseAngle + toothFraction * 0.62;
+                        break;
+                    case 5: // Raiz após o dente
+                        r = rootRadius;
+                        a = baseAngle + toothFraction * 0.80;
+                        break;
+                }
+
+                const x = Math.cos(a) * r;
+                const y = Math.sin(a) * r;
+
+                if (i === 0) shape.moveTo(x, y);
+                else shape.lineTo(x, y);
+            }
+
+            // Furo central para o eixo
+            const holePath = new THREE.Path();
+            holePath.absarc(0, 0, boreRadius, 0, Math.PI * 2, true);
+            shape.holes.push(holePath);
+
+            const extrudeSettings = {
+                depth: faceWidth,
+                bevelEnabled: true,
+                bevelSegments: 2,
+                steps: 1,
+                bevelSize: 0.6,
+                bevelThickness: 0.6
+            };
+
+            const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            geo.rotateX(Math.PI / 2); // Deitar engrenagem horizontalmente
+            return geo;
+        }
+
+        const pinionGeo = createSpurGearGeometry(
+            CONFIG.pinionTeeth,
+            2.0,
+            pinionFaceWidth,
+            12.0,
+            CONFIG.shaftDiameter/2
+        );
+        const pinionMesh = new THREE.Mesh(pinionGeo, MATS.polishedSteel);
+        pinionMesh.position.y = pinionY;
+        pinionMesh.castShadow = true;
+        rotatingPinionAssembly.add(pinionMesh);
+
+        // Cubo superior do pinhão com chanfro e parafuso de travamento
+        const pinionHub = new THREE.Mesh(
+            new THREE.CylinderGeometry(8.5, 9.5, 5, 24),
+            MATS.polishedSteel
+        );
+        pinionHub.position.y = pinionY + pinionFaceWidth/2 + 2.5;
+        rotatingPinionAssembly.add(pinionHub);
+
+        // Ponta de extensão do eixo acima do pinhão (fiel a Solucao2.png)
+        const shaftTopStub = new THREE.Mesh(
+            new THREE.CylinderGeometry(CONFIG.shaftDiameter/2, CONFIG.shaftDiameter/2, 8, 24),
+            MATS.polishedSteel
+        );
+        shaftTopStub.position.y = pinionY + pinionFaceWidth/2 + 6.5;
+        rotatingPinionAssembly.add(shaftTopStub);
+
+        // Adicionar subconjuntos rotativos ao carriageAssembly
+        carriageAssembly.add(rotatingEncoderShaft);
+        carriageAssembly.add(rotatingPinionAssembly);
+
+        // --- 6.9. CREMALHEIRA CIRCULAR E CÚPULA COM MECANISMO NO INTERIOR ---
+        // O pinhão leitor engrena na face interna da cremalheira em X = -20 mm.
+        // A cúpula engloba o observatório e o mecanismo, com seu centro em X = +160 mm.
+        // O mecanismo de medição (encoder, mola, trilho linear) fica no LADO DE DENTRO da cúpula!
+        const domeCenter = new THREE.Vector3(CONFIG.rackPitchRadius - CONFIG.pinionPitchRadius, 0, 0); // X = +160 mm
+        
+        const domeAssembly = new THREE.Group();
+        domeAssembly.position.set(domeCenter.x, 0, 0);
+        scene.add(domeAssembly);
+
+        // Construção do anel da cremalheira circular com dentes INTERNOS voltados para o mecanismo
+        function createCircularRackRing(radius, height, width, teethCount) {
+            const ringGroup = new THREE.Group();
+            
+            // Corpo anular da viga da cremalheira (parede externa da cúpula)
+            const ringGeo = new THREE.CylinderGeometry(radius + width, radius + width, height, 96, 1, true);
+            const ringMesh = new THREE.Mesh(ringGeo, MATS.domeRackSteel);
+            ringMesh.castShadow = true;
+            ringGroup.add(ringMesh);
+
+            // Flange estrutural superior e inferior da cremalheira
+            const flangeGeo = new THREE.RingGeometry(radius - 2, radius + width + 4, 96);
+            flangeGeo.rotateX(Math.PI / 2);
+            const flangeTop = new THREE.Mesh(flangeGeo, MATS.domeRackSteel);
+            flangeTop.position.y = height / 2;
+            ringGroup.add(flangeTop);
+
+            const flangeBottom = flangeTop.clone();
+            flangeBottom.position.y = -height / 2;
+            ringGroup.add(flangeBottom);
+
+            // Dentes individuais da cremalheira voltados para o INTERIOR (engrenando no pinhão por dentro)
+            const toothW = 3.0;
+            const toothH = height - 1.0;
+            const toothDepth = 3.8;
+            const toothGeo = new THREE.BoxGeometry(toothDepth, toothH, toothW);
+            
+            // Distribuir dentes com o passo angular voltados para dentro
+            const visibleTeethCount = 180; // Dentes com espaçamento regular na cremalheira
+            const toothInstanced = new THREE.InstancedMesh(toothGeo, MATS.domeRackSteel, visibleTeethCount);
+            toothInstanced.castShadow = true;
+            
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < visibleTeethCount; i++) {
+                const angle = (i / visibleTeethCount) * Math.PI * 2;
+                dummy.position.set(
+                    Math.cos(angle) * (radius - toothDepth/2 + 0.4),
+                    0,
+                    Math.sin(angle) * (radius - toothDepth/2 + 0.4)
+                );
+                dummy.rotation.y = -angle + Math.PI; // Dentes apontando para dentro em direção ao pinhão
+                dummy.updateMatrix();
+                toothInstanced.setMatrixAt(i, dummy.matrix);
+            }
+            toothInstanced.instanceMatrix.needsUpdate = true;
+            ringGroup.add(toothInstanced);
+
+            return ringGroup;
+        }
+
+        const rackAssembly = createCircularRackRing(
+            CONFIG.rackPitchRadius,
+            pinionFaceWidth + 2.0,
+            18.0,
+            CONFIG.rackTeethEquivalent
+        );
+        rackAssembly.position.y = pinionY;
+        domeAssembly.add(rackAssembly);
+
+        // --- 6.10. CÚPULA ESTILIZADA DO OBSERVATÓRIO COM JANELA / SLIT ---
+        const domeVisualGroup = new THREE.Group();
+        domeAssembly.add(domeVisualGroup);
+
+        const domeRadius = CONFIG.rackPitchRadius + 12;
+        const domeHeight = 150;
+
+        // Hemisfério da cúpula com recorte para a fenda de observação (Slit)
+        const domeGeo = new THREE.SphereGeometry(
+            domeRadius,
+            48,
+            32,
+            0,
+            Math.PI * 1.76, // Abertura angular para o slit
+            0,
+            Math.PI * 0.52
+        );
+        const domeHemisphere = new THREE.Mesh(domeGeo, MATS.domeGlass);
+        domeHemisphere.position.y = pinionY + 8;
+        domeHemisphere.castShadow = true;
+        domeVisualGroup.add(domeHemisphere);
+
+        // Nervuras estruturais da cúpula (arcos meridianos metálicos)
+        for (let a = 0; a < Math.PI * 1.76; a += Math.PI / 4) {
+            const ribCurve = new THREE.EllipseCurve(0, 0, domeRadius + 0.5, domeRadius + 0.5, 0, Math.PI / 2, false, 0);
+            const ribPoints = ribCurve.getPoints(24);
+            const ribGeo = new THREE.BufferGeometry().setFromPoints(ribPoints.map(p => new THREE.Vector3(p.x, p.y, 0)));
+            const ribLine = new THREE.Line(ribGeo, new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.4 }));
+            ribLine.rotation.y = a;
+            ribLine.position.y = pinionY + 8;
+            domeVisualGroup.add(ribLine);
+        }
+
+        // Obturadores laterais da fenda de observação (Shutters)
+        const shutterGeo = new THREE.BoxGeometry(4, domeHeight * 0.75, 12);
+        const shutterLeft = new THREE.Mesh(shutterGeo, MATS.domeSlitShutter);
+        shutterLeft.position.set(domeRadius * 0.7, pinionY + 55, domeRadius * 0.4);
+        domeVisualGroup.add(shutterLeft);
+
+        const shutterRight = shutterLeft.clone();
+        shutterRight.position.z = -domeRadius * 0.4;
+        domeVisualGroup.add(shutterRight);
+
+        // Telescópio Astronômico Estilizado no Centro da Cúpula
+        const telescopeGroup = new THREE.Group();
+        telescopeGroup.position.set(0, pinionY + 30, 0);
+        domeAssembly.add(telescopeGroup);
+
+        // Tubo óptico do telescópio apontando em ângulo de 45°
+        const scopeTubeGeo = new THREE.CylinderGeometry(14, 18, 90, 24);
+        scopeTubeGeo.rotateZ(Math.PI / 4);
+        const scopeTube = new THREE.Mesh(scopeTubeGeo, MATS.encoderHousing);
+        scopeTube.castShadow = true;
+        telescopeGroup.add(scopeTube);
+
+        // Parasol do telescópio com anel ciano
+        const dewShield = new THREE.Mesh(
+            new THREE.CylinderGeometry(15, 15, 16, 24),
+            MATS.brushedSteel
+        );
+        dewShield.rotateZ(Math.PI / 4);
+        dewShield.position.set(32, 32, 0);
+        telescopeGroup.add(dewShield);
+
+        // Lente objetiva do telescópio (vidro anti-reflexo azulado)
+        const lensGeo = new THREE.CircleGeometry(14, 24);
+        lensGeo.rotateY(Math.PI / 2);
+        lensGeo.rotateZ(-Math.PI / 4);
+        const lensMat = new THREE.MeshPhysicalMaterial({ color: 0x00ffff, transmission: 0.9, roughness: 0.1 });
+        const lensMesh = new THREE.Mesh(lensGeo, lensMat);
+        lensMesh.position.set(38, 38, 0);
+        telescopeGroup.add(lensMesh);
+
+        // Montagem Equatorial / Garfo do Telescópio
+        const forkBase = new THREE.Mesh(
+            new THREE.CylinderGeometry(12, 16, 35, 16),
+            MATS.carriageBody
+        );
+        forkBase.position.y = -20;
+        telescopeGroup.add(forkBase);
+
+        // Coluna / Pier estrutural do telescópio descendo até o piso do observatório
+        const pierHeight = pinionY + 12;
+        const pierGeo = new THREE.CylinderGeometry(14, 18, pierHeight, 24);
+        const pierMesh = new THREE.Mesh(pierGeo, MATS.carriageBody);
+        pierMesh.position.y = -20 - pierHeight / 2;
+        pierMesh.castShadow = true;
+        pierMesh.receiveShadow = true;
+        telescopeGroup.add(pierMesh);
+
+        // Flange com base metálica da coluna do telescópio fixada ao piso
+        const pierFlangeGeo = new THREE.CylinderGeometry(24, 26, 6, 24);
+        const pierFlange = new THREE.Mesh(pierFlangeGeo, MATS.brushedSteel);
+        pierFlange.position.y = -20 - pierHeight + 3;
+        pierFlange.receiveShadow = true;
+        telescopeGroup.add(pierFlange);
+
+        // --- 7. ANOTAÇÕES 3D E VISTA EXPLODIDA ---
+        // Componentes para rotulação e translação explodida
+        const EXPLODE_ITEMS = [
+            {
+                name: "Pinhão Leitor e Eixo (Z=20, M=2)",
+                sub: "Eixo usinado e engrenagem de dentes retos",
+                object: rotatingPinionAssembly,
+                vector: new THREE.Vector3(0, 45, 0),
+                posOffset: new THREE.Vector3(0, 10, 0)
+            },
+            {
+                name: "Acoplamento Oldham",
+                sub: "Baixa folga torsional e absorção angular",
+                object: couplingGroup,
+                vector: new THREE.Vector3(0, 25, 0),
+                posOffset: new THREE.Vector3(0, 5, 0)
+            },
+            {
+                name: "Encoder Absoluto Multivoltas",
+                sub: "12 bits single / 12 bits multi (BiSS/SSI)",
+                object: encoderBodyMesh,
+                vector: new THREE.Vector3(0, 10, 0),
+                posOffset: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                name: "Patim Guia Linear MGN15",
+                sub: "Liberdade radial para absorver runout",
+                object: carriageBodyMesh,
+                vector: new THREE.Vector3(0, -10, 0),
+                posOffset: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                name: "Mola Helicoidal de Pré-Carga",
+                sub: "Garante engrenamento contínuo sem folga",
+                object: springMesh,
+                vector: new THREE.Vector3(20, 0, 0),
+                posOffset: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                name: "Base Fixa do Observatório",
+                sub: "Estrutura rígida de suporte em alumínio",
+                object: baseMesh,
+                vector: new THREE.Vector3(0, -25, 0),
+                posOffset: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                name: "Cremalheira da Cúpula (Z=1200)",
+                sub: "Segmento anular montado na base móvel",
+                object: rackAssembly,
+                vector: new THREE.Vector3(-35, 0, 0),
+                posOffset: new THREE.Vector3(0, 0, 0)
+            }
+        ];
+
+        // Criar elementos HTML de anotação na tela
+        const annotationsContainer = document.getElementById('annotations-container');
+        EXPLODE_ITEMS.forEach((item, index) => {
+            const marker = document.createElement('div');
+            marker.className = 'annotation-marker';
+            marker.id = `marker-${index}`;
+            marker.innerHTML = `
+                <div class="marker-card">
+                    <span class="num">${index + 1}</span>
+                    <div>
+                        <strong style="display:block; color:var(--accent-cyan);">${item.name}</strong>
+                        <span style="font-size:0.62rem; color:var(--text-dim);">${item.sub}</span>
+                    </div>
+                </div>
+                <div class="marker-arrow"></div>
+            `;
+            annotationsContainer.appendChild(marker);
+            item.domElement = marker;
+            item.worldPos = new THREE.Vector3();
+        });
+
+        // Guardar posições originais locais dos itens para interpolação explodida
+        EXPLODE_ITEMS.forEach(item => {
+            item.origPos = item.object.position.clone();
+        });
+
+        // --- 8. ATUALIZAÇÃO CINEMÁTICA E LOOP DE ANIMAÇÃO ---
+        let lastTime = performance.now();
+
+        function updateKinematics(deltaTime) {
+            // 1. Atualizar Rotação da Cúpula (se não for ajuste manual)
+            if (STATE.isRunning && !STATE.isManual) {
+                const deltaAngle = STATE.domeSpeed * STATE.direction * deltaTime;
+                STATE.domeAzimuth = (STATE.domeAzimuth + deltaAngle) % 360.0;
+                if (STATE.domeAzimuth < 0) STATE.domeAzimuth += 360.0;
+                
+                // Atualizar slider manual para refletir o giro
+                document.getElementById('slider-azimuth').value = STATE.domeAzimuth.toFixed(2);
+            }
+
+            // Converter azimute da cúpula para radianos no Three.js
+            const domeRad = THREE.MathUtils.degToRad(STATE.domeAzimuth);
+            domeAssembly.rotation.y = domeRad;
+
+            // 2. Sincronismo do Pinhão (Rt = 60, engrenamento interno: mesmo sentido de rotação da cúpula)
+            // ω_pinhão = +60 * ω_cúpula (cremalheira circular interna)
+            const pinionTotalAngleDeg = CONFIG.gearRatio * (STATE.domeAzimuth - STATE.calibrationOffset);
+            const pinionRad = THREE.MathUtils.degToRad(pinionTotalAngleDeg);
+
+            // O pinhão, acoplamento Oldham e eixo do encoder giram no seu próprio eixo Y
+            rotatingPinionAssembly.rotation.y = pinionRad;
+            rotatingEncoderShaft.rotation.y = pinionRad;
+            couplingGroup.rotation.y = pinionRad;
+
+            // 3. Simulação de Runout Radial / Excentricidade da Cúpula
+            // Variação radial da cremalheira: r(θ) = e * sin(freq * θ)
+            const radialRunout = STATE.eccentricity * Math.sin(domeRad * STATE.eccentricityFreq);
+            STATE.carriageXOffset = radialRunout;
+
+            // O conjunto móvel (patim + encoder + pinhão) translada em X acompanhando a cremalheira
+            carriageAssembly.position.x = STATE.carriageXOffset;
+
+            // 4. Deformação Dinâmica da Mola e Cálculo de Força
+            // Quando o patim se desloca em +X (para a direita), a mola se comprime:
+            // DeltaX positivo = compressão adicional
+            STATE.currentSpringDelta = STATE.carriageXOffset;
+            STATE.currentSpringForce = CONFIG.springPreloadNominal + (CONFIG.springStiffness * STATE.currentSpringDelta);
+
+            // Reconstrução procedural da mola em tempo real sem distorção geométrica
+            updateSpringGeometry(STATE.carriageXOffset);
+
+            // 5. Interpolação da Vista Explodida (Smooth Lerp)
+            const targetExplode = STATE.isExploded ? (parseFloat(document.getElementById('slider-explode').value) / 100 || 1.0) : 0.0;
+            STATE.explodeProgress += (targetExplode - STATE.explodeProgress) * 0.12;
+
+            EXPLODE_ITEMS.forEach((item, idx) => {
+                const currentOffset = item.vector.clone().multiplyScalar(STATE.explodeProgress);
+                item.object.position.copy(item.origPos).add(currentOffset);
+
+                // Atualizar posição dos callouts 3D na tela
+                if (item.domElement) {
+                    if (STATE.explodeProgress > 0.15) {
+                        item.object.getWorldPosition(item.worldPos);
+                        item.worldPos.add(item.posOffset);
+
+                        // Projetar coordenadas 3D para o plano 2D da tela
+                        const screenPos = item.worldPos.clone().project(camera);
+                        const isBehindCamera = screenPos.z > 1;
+
+                        if (!isBehindCamera) {
+                            const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+                            const y = (-(screenPos.y * 0.5) + 0.5) * window.innerHeight;
+
+                            item.domElement.style.left = `${x}px`;
+                            item.domElement.style.top = `${y}px`;
+                            item.domElement.classList.add('visible');
+                        } else {
+                            item.domElement.classList.remove('visible');
+                        }
+                    } else {
+                        item.domElement.classList.remove('visible');
+                    }
+                }
+            });
+
+            // 6. Atualizar Leituras do Dashboard / Telemetria em Tempo Real
+            updateTelemetryDisplay(pinionTotalAngleDeg);
+        }
+
+        // Formatação de Graus, Minutos e Segundos de Arco (DMS)
+        function formatDMS(degrees) {
+            const d = Math.floor(degrees);
+            const mFull = (degrees - d) * 60;
+            const m = Math.floor(mFull);
+            const s = ((mFull - m) * 60).toFixed(1);
+            return `${String(d).padStart(3, '0')}° ${String(m).padStart(2, '0')}' ${String(s).padStart(4, '0')}"`;
+        }
+
+        function updateTelemetryDisplay(pinionTotalDeg) {
+            // Azimute Cúpula
+            document.getElementById('disp-dome-dms').innerText = formatDMS(STATE.domeAzimuth);
+            document.getElementById('disp-dome-deg').innerText = `Decimal: ${STATE.domeAzimuth.toFixed(4)}°`;
+            document.getElementById('disp-manual-val').innerText = `${STATE.domeAzimuth.toFixed(2)}°`;
+
+            // Voltas do Encoder (Multiturn)
+            const absolutePinionTurns = Math.abs(pinionTotalDeg) / 360.0;
+            document.getElementById('disp-turns').innerText = `${absolutePinionTurns.toFixed(2)} v`;
+
+            // Posição Singleturn (0° a 360°)
+            let singleturnDeg = (pinionTotalDeg % 360.0);
+            if (singleturnDeg < 0) singleturnDeg += 360.0;
+            document.getElementById('disp-pinion-angle').innerText = `${singleturnDeg.toFixed(1)}°`;
+
+            // Código Digital 12-Bit (0 a 4095)
+            const digitalCode = Math.floor((singleturnDeg / 360.0) * CONFIG.encoderCountsPerRev);
+            document.getElementById('disp-raw-code').innerText = String(digitalCode).padStart(4, '0');
+
+            // Telemetria da Mola e Guia Linear
+            document.getElementById('disp-spring-delta').innerText = `${STATE.currentSpringDelta >= 0 ? '+' : ''}${STATE.currentSpringDelta.toFixed(2)} mm`;
+            document.getElementById('disp-carriage-x').innerText = `X patim: ${STATE.carriageXOffset.toFixed(2)} mm`;
+            document.getElementById('disp-spring-force').innerText = `${STATE.currentSpringForce.toFixed(1)} N`;
+
+            // Barra de Força da Mola (porcentagem relativa)
+            const forcePct = Math.min(Math.max((STATE.currentSpringForce / 70.0) * 100, 10), 95);
+            document.getElementById('spring-gauge-fill').style.width = `${forcePct}%`;
+            document.getElementById('disp-spring-pct').innerText = `${Math.round(forcePct)}% nominal`;
+        }
+
+        // --- 9. INTERPOLAÇÃO DE CÂMERA (PRESETS) ---
+        let cameraTransition = {
+            active: false,
+            startPos: new THREE.Vector3(),
+            endPos: new THREE.Vector3(),
+            startTarget: new THREE.Vector3(),
+            endTarget: new THREE.Vector3(),
+            startTime: 0,
+            duration: 1200
+        };
+
+        function setCameraPreset(targetPos, targetLookAt, duration = 1200) {
+            cameraTransition.active = true;
+            cameraTransition.startPos.copy(camera.position);
+            cameraTransition.endPos.copy(targetPos);
+            cameraTransition.startTarget.copy(controls.target);
+            cameraTransition.endTarget.copy(targetLookAt);
+            cameraTransition.startTime = performance.now();
+            cameraTransition.duration = duration;
+        }
+
+        function updateCameraTransition() {
+            if (!cameraTransition.active) return;
+            const now = performance.now();
+            const elapsed = now - cameraTransition.startTime;
+            const t = Math.min(elapsed / cameraTransition.duration, 1.0);
+            
+            // Easing cúbico suave
+            const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+            camera.position.lerpVectors(cameraTransition.startPos, cameraTransition.endPos, ease);
+            controls.target.lerpVectors(cameraTransition.startTarget, cameraTransition.endTarget, ease);
+
+            if (t >= 1.0) {
+                cameraTransition.active = false;
+            }
+        }
+
+        // --- 10. CONTROLES DE INTERFACE E EVENT LISTENERS ---
+        // Play / Pause
+        const btnPlay = document.getElementById('btn-play-pause');
+        const playIcon = document.getElementById('play-icon');
+        const playText = document.getElementById('play-text');
+        btnPlay.addEventListener('click', () => {
+            STATE.isRunning = !STATE.isRunning;
+            STATE.isManual = false;
+            if (STATE.isRunning) {
+                playIcon.innerText = '⏸️';
+                playText.innerText = 'Pausar Giro';
+                btnPlay.classList.add('btn-primary');
+            } else {
+                playIcon.innerText = '▶️';
+                playText.innerText = 'Retomar Giro';
+                btnPlay.classList.remove('btn-primary');
+            }
+        });
+
+        // Inverter Sentido
+        document.getElementById('btn-reverse-dir').addEventListener('click', () => {
+            STATE.direction *= -1;
+        });
+
+        // Reset Home / Offset de Calibração
+        document.getElementById('btn-reset-home').addEventListener('click', () => {
+            STATE.calibrationOffset = STATE.domeAzimuth;
+            // Flash visual no card
+            const dmsCard = document.getElementById('disp-dome-dms');
+            dmsCard.style.color = '#10e080';
+            setTimeout(() => { dmsCard.style.color = ''; }, 600);
+        });
+
+        // Modos: Slew vs Sideral
+        const btnSlew = document.getElementById('btn-mode-slew');
+        const btnSidereal = document.getElementById('btn-mode-sidereal');
+
+        btnSlew.addEventListener('click', () => {
+            STATE.mode = 'slew';
+            STATE.domeSpeed = 4.0;
+            document.getElementById('slider-speed').value = 4.0;
+            document.getElementById('disp-speed-val').innerText = '4.0 °/s';
+            btnSlew.classList.add('btn-active');
+            btnSidereal.classList.remove('btn-active');
+        });
+
+        btnSidereal.addEventListener('click', () => {
+            STATE.mode = 'sidereal';
+            STATE.domeSpeed = 0.25; // Rastreio acelerado para visualização suave
+            document.getElementById('slider-speed').value = 0.25;
+            document.getElementById('disp-speed-val').innerText = '0.25 °/s';
+            btnSidereal.classList.add('btn-active');
+            btnSlew.classList.remove('btn-active');
+        });
+
+        // Slider de Velocidade
+        const sliderSpeed = document.getElementById('slider-speed');
+        sliderSpeed.addEventListener('input', (e) => {
+            STATE.domeSpeed = parseFloat(e.target.value);
+            document.getElementById('disp-speed-val').innerText = `${STATE.domeSpeed.toFixed(1)} °/s`;
+            btnSlew.classList.remove('btn-active');
+            btnSidereal.classList.remove('btn-active');
+        });
+
+        // Slider Manual de Azimute
+        const sliderAzimuth = document.getElementById('slider-azimuth');
+        sliderAzimuth.addEventListener('input', (e) => {
+            STATE.domeAzimuth = parseFloat(e.target.value);
+            STATE.isManual = true;
+            STATE.isRunning = false;
+            playIcon.innerText = '▶️';
+            playText.innerText = 'Retomar Giro';
+            btnPlay.classList.remove('btn-primary');
+        });
+
+        // Slider de Excentricidade / Runout Radial
+        const sliderEcc = document.getElementById('slider-eccentricity');
+        sliderEcc.addEventListener('input', (e) => {
+            STATE.eccentricity = parseFloat(e.target.value);
+            document.getElementById('disp-ecc-val').innerText = `\u00B1${STATE.eccentricity.toFixed(2)} mm`;
+        });
+
+        // Botão e Slider de Vista Explodida
+        const btnExplode = document.getElementById('btn-explode-view');
+        const explodeText = document.getElementById('explode-state-text');
+        const sliderExplodeContainer = document.getElementById('explode-slider-container');
+        const sliderExplode = document.getElementById('slider-explode');
+
+        btnExplode.addEventListener('click', () => {
+            STATE.isExploded = !STATE.isExploded;
+            if (STATE.isExploded) {
+                explodeText.innerText = 'ATIVA (100%)';
+                explodeText.style.color = 'var(--accent-green)';
+                btnExplode.classList.add('btn-active');
+                sliderExplodeContainer.style.display = 'flex';
+                sliderExplode.style.display = 'block';
+                sliderExplode.value = 100;
+                document.getElementById('disp-explode-val').innerText = '100%';
+            } else {
+                explodeText.innerText = 'DESATIVADA';
+                explodeText.style.color = 'var(--accent-orange)';
+                btnExplode.classList.remove('btn-active');
+                sliderExplodeContainer.style.display = 'none';
+                sliderExplode.style.display = 'none';
+                sliderExplode.value = 0;
+            }
+        });
+
+        sliderExplode.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('disp-explode-val').innerText = `${val}%`;
+        });
+
+        // Toggle Cúpula
+        const btnToggleDome = document.getElementById('btn-toggle-dome');
+        btnToggleDome.addEventListener('click', () => {
+            STATE.showDome = !STATE.showDome;
+            domeVisualGroup.visible = STATE.showDome;
+            btnToggleDome.innerText = STATE.showDome ? '🔭 Ocultar Cúpula' : '🔭 Exibir Cúpula';
+        });
+
+        // Toggle Grade
+        const btnToggleGrid = document.getElementById('btn-toggle-grid');
+        btnToggleGrid.addEventListener('click', () => {
+            STATE.showGrid = !STATE.showGrid;
+            gridHelper.visible = STATE.showGrid;
+        });
+
+        // --- PRESETS DE CÂMERA ---
+        // 1. Isométrica Geral (Enquadra Cúpula e Mecanismo no Interior)
+        document.getElementById('btn-cam-iso').addEventListener('click', () => {
+            setCameraPreset(new THREE.Vector3(170, 160, 230), new THREE.Vector3(40, 50, 0));
+        });
+
+        // 2. Perfil CAD Exato (Alinhamento idêntico à imagem Solucao2.png)
+        document.getElementById('btn-cam-cad').addEventListener('click', () => {
+            setCameraPreset(new THREE.Vector3(0, 55, 170), new THREE.Vector3(0, 55, 0));
+        });
+
+        // 3. Foco no Engrenamento do Pinhão com a Cremalheira Interna
+        document.getElementById('btn-cam-gear').addEventListener('click', () => {
+            setCameraPreset(new THREE.Vector3(25, 135, 75), new THREE.Vector3(-10, 110, 0));
+        });
+
+        // 4. Foco na Mola, Patim e Trilho Linear
+        document.getElementById('btn-cam-spring').addEventListener('click', () => {
+            setCameraPreset(new THREE.Vector3(75, 45, 95), new THREE.Vector3(25, 25, 0));
+        });
+
+        // 5. Vista Superior da Cúpula Completa
+        document.getElementById('btn-cam-dome').addEventListener('click', () => {
+            setCameraPreset(new THREE.Vector3(160, 430, 250), new THREE.Vector3(160, 50, 0));
+        });
+
+        // --- 10.1. REPOSICIONAMENTO E ARRASTE LIVRE DOS PAINÉIS ---
+        function makeDraggable(panel, handle) {
+            let isDragging = false;
+            let startX, startY, origLeft, origTop;
+
+            handle.addEventListener('mousedown', (e) => {
+                if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = panel.getBoundingClientRect();
+                origLeft = rect.left;
+                origTop = rect.top;
+
+                panel.style.left = `${origLeft}px`;
+                panel.style.top = `${origTop}px`;
+                panel.style.right = 'auto';
+                panel.style.bottom = 'auto';
+                e.preventDefault();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                const newX = Math.max(10, Math.min(window.innerWidth - panel.offsetWidth - 10, origLeft + dx));
+                const newY = Math.max(10, Math.min(window.innerHeight - panel.offsetHeight - 10, origTop + dy));
+                panel.style.left = `${newX}px`;
+                panel.style.top = `${newY}px`;
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+        }
+
+        const panelControls = document.getElementById('panel-controls');
+        const handleControls = document.getElementById('handle-controls');
+        const panelTelemetry = document.getElementById('panel-telemetry');
+        const handleTelemetry = document.getElementById('handle-telemetry');
+
+        makeDraggable(panelControls, handleControls);
+        makeDraggable(panelTelemetry, handleTelemetry);
+
+        // Minimização dos Painéis
+        const btnMinControls = document.getElementById('btn-min-controls');
+        const btnToggleControlsHdr = document.getElementById('btn-toggle-controls-hdr');
+        function toggleControls() {
+            panelControls.classList.toggle('panel-collapsed');
+            const isCollapsed = panelControls.classList.contains('panel-collapsed');
+            btnMinControls.innerText = isCollapsed ? '+' : '—';
+            btnMinControls.title = isCollapsed ? 'Expandir Controles' : 'Minimizar Controles';
+        }
+        btnMinControls.addEventListener('click', toggleControls);
+        btnToggleControlsHdr.addEventListener('click', toggleControls);
+
+        const btnMinTelemetry = document.getElementById('btn-min-telemetry');
+        const btnToggleTelemetryHdr = document.getElementById('btn-toggle-telemetry-hdr');
+        function toggleTelemetry() {
+            panelTelemetry.classList.toggle('panel-collapsed');
+            const isCollapsed = panelTelemetry.classList.contains('panel-collapsed');
+            btnMinTelemetry.innerText = isCollapsed ? '+' : '—';
+            btnMinTelemetry.title = isCollapsed ? 'Expandir Telemetria' : 'Minimizar Telemetria';
+        }
+        btnMinTelemetry.addEventListener('click', toggleTelemetry);
+        btnToggleTelemetryHdr.addEventListener('click', toggleTelemetry);
+
+        // Ocultar / Exibir Todo o HUD
+        const btnToggleHud = document.getElementById('btn-toggle-hud');
+        const btnFloatingShowHud = document.getElementById('btn-floating-show-hud');
+
+        function toggleEntireHud() {
+            document.body.classList.toggle('hud-hidden');
+            const isHidden = document.body.classList.contains('hud-hidden');
+            btnFloatingShowHud.style.display = isHidden ? 'inline-flex' : 'none';
+        }
+        btnToggleHud.addEventListener('click', toggleEntireHud);
+        btnFloatingShowHud.addEventListener('click', toggleEntireHud);
+
+        // Atalhos de Teclado Ergonômicos
+        window.addEventListener('keydown', (e) => {
+            // Ignorar se estiver digitando em inputs
+            if (e.target.tagName === 'INPUT') return;
+
+            if (e.key === 'h' || e.key === 'H') {
+                toggleEntireHud();
+            } else if (e.key === 'c' || e.key === 'C') {
+                toggleControls();
+            } else if (e.key === 't' || e.key === 'T') {
+                toggleTelemetry();
+            } else if (e.code === 'Space') {
+                e.preventDefault();
+                btnPlay.click();
+            }
+        });
+
+        // Redimensionamento de Janela
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- 11. LOOP PRINCIPAL DE RENDERIZAÇÃO (REQUEST ANIMATION FRAME) ---
+        function animate(currentTime) {
+            requestAnimationFrame(animate);
+
+            const deltaTime = Math.min((currentTime - lastTime) / 1000.0, 0.1);
+            lastTime = currentTime;
+
+            // Atualização Cinemática
+            updateKinematics(deltaTime);
+
+            // Interpolação de Câmera
+            updateCameraTransition();
+
+            // Atualização do OrbitControls
+            controls.update();
+
+            // Rotação sutil do campo estelar para imersão astronômica
+            starField.rotation.y = currentTime * 0.000015;
+
+            // Render
+            renderer.render(scene, camera);
+        }
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>
