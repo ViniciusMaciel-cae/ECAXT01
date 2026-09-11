@@ -2,7 +2,7 @@
 
 **Projeto:** Instrumentação Angular de Cúpula Astronômica  
 **Data:** Setembro 2026  
-**Equipe:** José Rafael de Carvalho / LNA  
+
 
 ---
 
