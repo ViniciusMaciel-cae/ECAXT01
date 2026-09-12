@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizador 3D - Solução 2: Medição Angular de Cúpula com Pinhão, Encoder e Pré-carga por Mola</title>
+    <title>Visualizador 3D - Solução 2: Encoder Superior, Mancal Duplo e Pré-carga por Mola</title>
     
     <!-- Three.js e OrbitControls via CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -645,7 +645,7 @@
             <div class="header-brand">
                 <div class="brand-badge">SOLUÇÃO 2</div>
                 <div class="header-titles">
-                    <h1>MEDIÇÃO AZIMUTAL &bull; CÚPULA DE TELESCÓPIO</h1>
+                    <h1>SOLUÇÃO 2: PINHÃO COM MANCAL DUPLO & ENCODER SUPERIOR</h1>
                 </div>
             </div>
             <div class="header-quick-actions">
@@ -958,7 +958,7 @@
         controls.maxDistance = 1200;
         controls.minDistance = 30;
         controls.maxPolarAngle = Math.PI / 2 + 0.08; // Não deixar passar muito abaixo do piso
-        controls.target.set(0, 45, 0);
+        controls.target.set(0, 85, 0);
 
         // --- 3. ILUMINAÇÃO DE ESTÚDIO TÉCNICO / OBSERVATÓRIO ---
         const ambientLight = new THREE.AmbientLight(0xd8e4f0, 0.65);
@@ -1386,195 +1386,96 @@
             springMesh.geometry = newGeo;
         }
 
-        // --- 6.5. ENCODER ABSOLUTO MULTIVOLTAS (Montado sobre o Patim) ---
-        // Bloco adaptador / flange quadrado de fixação com 4 parafusos allen nos cantos (exatamente como em Solucao2.png)
-        const encoderBaseY = carriageY + CONFIG.carriageHeight / 2;
-        const encoderFlangeThick = 6.0;
-        const encoderFlangeSize = 34.0;
-        const encoderFlangeGeo = new THREE.BoxGeometry(encoderFlangeSize, encoderFlangeThick, encoderFlangeSize);
-        const encoderFlangeMesh = new THREE.Mesh(encoderFlangeGeo, MATS.encoderFlange);
-        encoderFlangeMesh.position.set(0, encoderBaseY + encoderFlangeThick/2, 0);
-        encoderFlangeMesh.castShadow = true;
-        carriageAssembly.add(encoderFlangeMesh);
+        // --- 6.5. MANCAL DUPLO ROBUSTO (Montado diretamente sobre o Patim da Guia Linear) ---
+        // Baseado exatamente no projeto mecatrônico de referência (Gemini_Generated_Image_bh6gtabh6gtabh6g.jfif):
+        // O mancal duplo aloja 2 rolamentos de precisão rígidos que absorvem 100% dos esforços radiais
+        // e axiais provenientes do engrenamento do pinhão com a cremalheira, protegendo o encoder.
+        const carriageTopY = carriageY + CONFIG.carriageHeight / 2; // y = 34.0 mm
+        const doubleBearingGroup = new THREE.Group();
+        carriageAssembly.add(doubleBearingGroup);
 
-        // 4 Parafusos Allen na face frontal/superior do encoder (visíveis no CAD)
-        const encBoltDist = 12.0;
+        const mancalHeight = 18.0;
+        const mancalWidthX = 36.0;
+        const mancalDepthZ = 30.0;
+        
+        // Bloco usinado retangular do mancal duplo
+        const mancalBoxGeo = new THREE.BoxGeometry(mancalWidthX, mancalHeight, mancalDepthZ);
+        const mancalBoxMesh = new THREE.Mesh(mancalBoxGeo, MATS.brushedSteel);
+        mancalBoxMesh.position.set(0, carriageTopY + mancalHeight / 2, 0); // y = 43.0 mm
+        mancalBoxMesh.castShadow = true;
+        mancalBoxMesh.receiveShadow = true;
+        doubleBearingGroup.add(mancalBoxMesh);
+
+        // Chanfros / rebaixos de precisão nas laterais do mancal
+        const mancalCutMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.35 });
+        const sideBevelLeft = new THREE.Mesh(new THREE.BoxGeometry(2, mancalHeight - 2, mancalDepthZ + 0.2), mancalCutMat);
+        sideBevelLeft.position.set(-mancalWidthX / 2 + 1, carriageTopY + mancalHeight / 2, 0);
+        doubleBearingGroup.add(sideBevelLeft);
+
+        const sideBevelRight = sideBevelLeft.clone();
+        sideBevelRight.position.x = mancalWidthX / 2 - 1;
+        doubleBearingGroup.add(sideBevelRight);
+
+        // 4 Parafusos Allen de fixação do mancal duplo no patim da guia linear
+        const mbX = 13.0;
+        const mbZ = 10.5;
         [
-            [-encBoltDist, -encBoltDist],
-            [ encBoltDist, -encBoltDist],
-            [-encBoltDist,  encBoltDist],
-            [ encBoltDist,  encBoltDist]
-        ].forEach(([ex, ez]) => {
-            const eBolt = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 2, 10), MATS.blackBolt);
-            eBolt.position.set(ex, encoderBaseY + encoderFlangeThick + 0.8, ez);
-            carriageAssembly.add(eBolt);
+            [-mbX, -mbZ],
+            [ mbX, -mbZ],
+            [-mbX,  mbZ],
+            [ mbX,  mbZ]
+        ].forEach(([bx, bz]) => {
+            const mBolt = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 3, 12), MATS.blackBolt);
+            mBolt.position.set(bx, carriageTopY + mancalHeight + 1.0, bz);
+            doubleBearingGroup.add(mBolt);
+
+            const mHex = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 1.5, 6), MATS.carriageBody);
+            mHex.position.set(bx, carriageTopY + mancalHeight + 2.1, bz);
+            doubleBearingGroup.add(mHex);
         });
 
-        // Corpo cilíndrico principal do Encoder Industrial
-        const encoderBodyY = encoderBaseY + encoderFlangeThick + CONFIG.encoderHeight / 2;
-        const encoderBodyGeo = new THREE.CylinderGeometry(CONFIG.encoderDiameter/2, CONFIG.encoderDiameter/2, CONFIG.encoderHeight, 32);
-        const encoderBodyMesh = new THREE.Mesh(encoderBodyGeo, MATS.encoderHousing);
-        encoderBodyMesh.position.set(0, encoderBodyY, 0);
-        encoderBodyMesh.castShadow = true;
-        carriageAssembly.add(encoderBodyMesh);
+        // Saliente cilíndrico usinado do rolamento superior (bearing boss)
+        const bossRadius = 12.0;
+        const bossHeight = 6.0;
+        const bossGeo = new THREE.CylinderGeometry(bossRadius, bossRadius + 1.0, bossHeight, 32);
+        const bossMesh = new THREE.Mesh(bossGeo, MATS.polishedSteel);
+        bossMesh.position.set(0, carriageTopY + mancalHeight + bossHeight / 2, 0); // y = 55.0 mm
+        bossMesh.castShadow = true;
+        doubleBearingGroup.add(bossMesh);
 
-        // Faixa de etiqueta técnica com detalhes industriais
-        const labelGeo = new THREE.CylinderGeometry(CONFIG.encoderDiameter/2 + 0.1, CONFIG.encoderDiameter/2 + 0.1, 14, 32, 1, true);
-        const labelMat = new THREE.MeshStandardMaterial({
-            color: 0x1e2633,
-            metalness: 0.3,
-            roughness: 0.6
-        });
-        const labelMesh = new THREE.Mesh(labelGeo, labelMat);
-        labelMesh.position.set(0, encoderBodyY, 0);
-        carriageAssembly.add(labelMesh);
+        // Anel de retenção retificado e anel vedador (rubber seal ring)
+        const sealRingGeo = new THREE.CylinderGeometry(9.8, 9.8, 1.2, 32);
+        const sealRingMesh = new THREE.Mesh(sealRingGeo, MATS.carriageBody);
+        sealRingMesh.position.set(0, carriageTopY + mancalHeight + bossHeight + 0.6, 0); // y = 58.6 mm
+        doubleBearingGroup.add(sealRingMesh);
 
-        // Conector Traseiro M12 Industrial e Cabo Elétrico Flexível para o PLC
-        const m12Base = new THREE.Mesh(
-            new THREE.CylinderGeometry(4.5, 4.5, 8, 16),
+        // --- 6.6. PINHÃO LEITOR E EIXO INFERIOR (Acima do Mancal Duplo) ---
+        // Conforme a imagem de referência, o pinhão fica imediatamente acima do mancal duplo.
+        const pinionFaceWidth = 14.0;
+        const pinionY = 68.0; // Altura precisa para engrenamento com a cremalheira
+        const pinionGroup = new THREE.Group();
+        rotatingPinionAssembly.add(pinionGroup);
+
+        // Eixo retificado inferior (Ø 10 mm)
+        // Estende-se desde o interior do mancal duplo (y = 36) atravessando o pinhão até o acoplamento flexível (y = 92)
+        const lowerShaftBottom = carriageTopY + 2; // y = 36 mm
+        const lowerShaftTop = 92.0;               // y = 92 mm (penetra no acoplamento flexível)
+        const lowerShaftLen = lowerShaftTop - lowerShaftBottom; // 56 mm
+        const lowerShaftGeo = new THREE.CylinderGeometry(CONFIG.shaftDiameter / 2, CONFIG.shaftDiameter / 2, lowerShaftLen, 32);
+        const lowerShaftMesh = new THREE.Mesh(lowerShaftGeo, MATS.polishedSteel);
+        lowerShaftMesh.position.set(0, lowerShaftBottom + lowerShaftLen / 2, 0);
+        lowerShaftMesh.castShadow = true;
+        rotatingPinionAssembly.add(lowerShaftMesh);
+
+        // Colar espaçador inferior do pinhão em latão
+        const lowerCollar = new THREE.Mesh(
+            new THREE.CylinderGeometry(7.5, 7.5, 3.0, 24),
             MATS.brass
         );
-        m12Base.rotation.x = Math.PI / 2;
-        m12Base.position.set(0, encoderBodyY - 4, -CONFIG.encoderDiameter/2 - 4);
-        carriageAssembly.add(m12Base);
+        lowerCollar.position.set(0, pinionY - pinionFaceWidth / 2 - 1.5, 0); // y = 59.5 mm
+        pinionGroup.add(lowerCollar);
 
-        // Porca serrilhada do conector
-        const m12Nut = new THREE.Mesh(
-            new THREE.CylinderGeometry(5.2, 5.2, 5, 8),
-            MATS.blackBolt
-        );
-        m12Nut.rotation.x = Math.PI / 2;
-        m12Nut.position.set(0, encoderBodyY - 4, -CONFIG.encoderDiameter/2 - 8);
-        carriageAssembly.add(m12Nut);
-
-        // Cabo elétrico flexível curvado saindo em direção ao painel
-        const cableCurve = new THREE.CatmullRomCurve3([
-            new THREE.Vector3(0, encoderBodyY - 4, -CONFIG.encoderDiameter/2 - 10),
-            new THREE.Vector3(0, encoderBodyY - 12, -CONFIG.encoderDiameter/2 - 25),
-            new THREE.Vector3(15, CONFIG.baseThickness + 10, -50),
-            new THREE.Vector3(40, CONFIG.baseThickness + 5, -80)
-        ]);
-        const cableGeo = new THREE.TubeGeometry(cableCurve, 40, 2.5, 12, false);
-        const cableMat = new THREE.MeshStandardMaterial({ color: 0x181a1f, roughness: 0.7, metalness: 0.1 });
-        const cableMesh = new THREE.Mesh(cableGeo, cableMat);
-        cableMesh.castShadow = true;
-        carriageAssembly.add(cableMesh);
-
-        // Colarinho de saída do eixo do encoder com retentor
-        const collarY = encoderBodyY + CONFIG.encoderHeight/2 + 3; // y = 81
-        const collarMesh = new THREE.Mesh(
-            new THREE.CylinderGeometry(11, 12, 6, 24),
-            MATS.encoderFlange
-        );
-        collarMesh.position.set(0, collarY, 0);
-        carriageAssembly.add(collarMesh);
-
-        // --- 6.5.1. EIXO DE SAÍDA DO ENCODER (Conexão Inferior ao Acoplamento) ---
-        // Eixo retificado que sai do encoder e entra no cubo inferior do acoplamento Oldham
-        const encShaftBottom = collarY + 3; // y = 84
-        const encShaftTop = 102;           // y = 102 (penetra 2mm no cubo inferior)
-        const encShaftHeight = encShaftTop - encShaftBottom; // 18 mm
-        const encShaftGeo = new THREE.CylinderGeometry(CONFIG.shaftDiameter/2, CONFIG.shaftDiameter/2, encShaftHeight, 32);
-        const encShaftMesh = new THREE.Mesh(encShaftGeo, MATS.polishedSteel);
-        encShaftMesh.position.set(0, encShaftBottom + encShaftHeight/2, 0); // y = 93
-        encShaftMesh.castShadow = true;
-        rotatingEncoderShaft.add(encShaftMesh);
-
-        // --- 6.6. ACOPLAMENTO DE JUNTA OLDHAM (Fiel a Solucao2.png) ---
-        // Posicionado exatamente entre o eixo do encoder (abaixo) e o eixo do pinhão (acima)
-        // Composto por: Cubo Inferior de Alumínio, Disco/Cruzeta Central de Poliacetal e Cubo Superior de Alumínio
-        const couplingCenterY = 114.0; // Ponto médio do acoplamento
-        const couplingGroup = new THREE.Group();
-        couplingGroup.position.set(0, couplingCenterY, 0);
-        carriageAssembly.add(couplingGroup);
-
-        const hubHeight = 11.5;
-        const discHeight = 4.0;
-        const cDiam = 28.0;
-
-        // 1. Cubo Inferior do Oldham (Cilíndrico usinado, ranhuras e furos transversais)
-        const lowerHubGeo = new THREE.CylinderGeometry(cDiam/2, cDiam/2, hubHeight, 32);
-        const lowerHubMesh = new THREE.Mesh(lowerHubGeo, MATS.aluminumOldham);
-        lowerHubMesh.position.set(0, -hubHeight/2 - discHeight/2, 0); // y = -7.75 local
-        lowerHubMesh.castShadow = true;
-        couplingGroup.add(lowerHubMesh);
-
-        // Rasgo / fenda de aperto no cubo inferior
-        const slotCutMat = new THREE.MeshStandardMaterial({ color: 0x1a202c, metalness: 0.8, roughness: 0.5 });
-        const slotCut1 = new THREE.Mesh(new THREE.BoxGeometry(2, hubHeight - 1, cDiam/2 + 2), slotCutMat);
-        slotCut1.position.set(0, -hubHeight/2 - discHeight/2, cDiam/4);
-        couplingGroup.add(slotCut1);
-
-        // 2 Parafusos Allen de travamento no cubo inferior
-        const clampBolt1 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 11, 12), MATS.blackBolt);
-        clampBolt1.rotation.z = Math.PI / 2;
-        clampBolt1.position.set(0, -hubHeight/2 - discHeight/2 - 2, cDiam/2 - 3.5);
-        couplingGroup.add(clampBolt1);
-
-        const clampBolt2 = clampBolt1.clone();
-        clampBolt2.position.y += 4;
-        couplingGroup.add(clampBolt2);
-
-        // 2. Cruzeta / Disco Central Autolubrificante com línguas ortogonais
-        const centerDiscGeo = new THREE.CylinderGeometry(cDiam/2 + 0.3, cDiam/2 + 0.3, discHeight, 32);
-        const centerDiscMesh = new THREE.Mesh(centerDiscGeo, MATS.oldhamDisc);
-        centerDiscMesh.position.set(0, 0, 0); // y = 0 local (y = 114 mundo)
-        centerDiscMesh.castShadow = true;
-        couplingGroup.add(centerDiscMesh);
-
-        // Língua/entalhe inferior da cruzeta (encaixa no cubo inferior)
-        const tongueLower = new THREE.Mesh(new THREE.BoxGeometry(cDiam * 0.9, 2.5, 4.5), MATS.oldhamDisc);
-        tongueLower.position.set(0, -discHeight/2 - 1.25, 0);
-        couplingGroup.add(tongueLower);
-
-        // Língua/entalhe superior da cruzeta (perpendicular, encaixa no cubo superior)
-        const tongueUpper = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.5, cDiam * 0.9), MATS.oldhamDisc);
-        tongueUpper.position.set(0, discHeight/2 + 1.25, 0);
-        couplingGroup.add(tongueUpper);
-
-        // 3. Cubo Superior do Oldham
-        const upperHubGeo = new THREE.CylinderGeometry(cDiam/2, cDiam/2, hubHeight, 32);
-        const upperHubMesh = new THREE.Mesh(upperHubGeo, MATS.aluminumOldham);
-        upperHubMesh.position.set(0, hubHeight/2 + discHeight/2, 0); // y = +7.75 local
-        upperHubMesh.castShadow = true;
-        couplingGroup.add(upperHubMesh);
-
-        // Rasgo no cubo superior
-        const slotCut2 = new THREE.Mesh(new THREE.BoxGeometry(cDiam/2 + 2, hubHeight - 1, 2), slotCutMat);
-        slotCut2.position.set(cDiam/4, hubHeight/2 + discHeight/2, 0);
-        couplingGroup.add(slotCut2);
-
-        // 2 Parafusos Allen no cubo superior
-        const clampBolt3 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 11, 12), MATS.blackBolt);
-        clampBolt3.rotation.x = Math.PI / 2;
-        clampBolt3.position.set(cDiam/2 - 3.5, hubHeight/2 + discHeight/2 - 2, 0);
-        couplingGroup.add(clampBolt3);
-
-        const clampBolt4 = clampBolt3.clone();
-        clampBolt4.position.y += 4;
-        couplingGroup.add(clampBolt4);
-
-        // --- 6.7. EIXO VERTICAL DO PINHÃO (Contínuo do Acoplamento ao Pinhão) ---
-        // Sai diretamente do topo do cubo superior do Oldham (y = 125.5) e sobe ininterruptamente até o topo do pinhão
-        const pinionFaceWidth = 14.0;
-        const pinionY = 172.0; // Altura precisa para engrenamento com a cremalheira
-        const shaftBottomY = couplingCenterY + hubHeight/2 + discHeight/2; // y = 125.5
-        const shaftTopY = pinionY + pinionFaceWidth/2 + 10;                // y = 189.0
-        const shaftTotalLength = shaftTopY - shaftBottomY;                 // 63.5 mm
-
-        const shaftGeo = new THREE.CylinderGeometry(CONFIG.shaftDiameter/2, CONFIG.shaftDiameter/2, shaftTotalLength, 32);
-        const shaftMesh = new THREE.Mesh(shaftGeo, MATS.polishedSteel);
-        shaftMesh.position.set(0, shaftBottomY + shaftTotalLength / 2, 0); // Perfeitamente centrado e contínuo
-        shaftMesh.castShadow = true;
-        rotatingPinionAssembly.add(shaftMesh);
-
-        // Colar de ajuste fino em latão sob o pinhão (conforme mecânica de precisão)
-        const shaftRing = new THREE.Mesh(new THREE.CylinderGeometry(7.0, 7.0, 3.5, 24), MATS.brass);
-        shaftRing.position.set(0, pinionY - pinionFaceWidth/2 - 2, 0);
-        rotatingPinionAssembly.add(shaftRing);
-
-        // --- 6.8. PINHÃO LEITOR (Z_p = 20 dentes, Módulo 2) ---
-        // Dp = 40 mm (Raio = 20 mm). Dentes retos 3D bem definidos!
+        // Geometria 3D precisa dos dentes retos do Pinhão (Z=20, M=2, Dp=40mm)
         function createSpurGearGeometry(teeth, module, faceWidth, hubRadius, boreRadius) {
             const pitchRadius = (module * teeth) / 2; // 20 mm
             const addendum = module;                   // 2 mm
@@ -1594,27 +1495,27 @@
 
                 let r, a;
                 switch (step) {
-                    case 0: // Raiz antes do flanco
+                    case 0:
                         r = rootRadius;
                         a = baseAngle;
                         break;
-                    case 1: // Início do flanco ativo
+                    case 1:
                         r = pitchRadius - 0.4;
                         a = baseAngle + toothFraction * 0.18;
                         break;
-                    case 2: // Topo do dente (canto esquerdo)
+                    case 2:
                         r = outerRadius;
                         a = baseAngle + toothFraction * 0.30;
                         break;
-                    case 3: // Topo do dente (canto direito)
+                    case 3:
                         r = outerRadius;
                         a = baseAngle + toothFraction * 0.50;
                         break;
-                    case 4: // Flanco descendente
+                    case 4:
                         r = pitchRadius - 0.4;
                         a = baseAngle + toothFraction * 0.62;
                         break;
-                    case 5: // Raiz após o dente
+                    case 5:
                         r = rootRadius;
                         a = baseAngle + toothFraction * 0.80;
                         break;
@@ -1627,7 +1528,6 @@
                 else shape.lineTo(x, y);
             }
 
-            // Furo central para o eixo
             const holePath = new THREE.Path();
             holePath.absarc(0, 0, boreRadius, 0, Math.PI * 2, true);
             shape.holes.push(holePath);
@@ -1642,7 +1542,7 @@
             };
 
             const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-            geo.rotateX(Math.PI / 2); // Deitar engrenagem horizontalmente
+            geo.rotateX(Math.PI / 2);
             return geo;
         }
 
@@ -1651,31 +1551,258 @@
             2.0,
             pinionFaceWidth,
             12.0,
-            CONFIG.shaftDiameter/2
+            CONFIG.shaftDiameter / 2
         );
         const pinionMesh = new THREE.Mesh(pinionGeo, MATS.polishedSteel);
         pinionMesh.position.y = pinionY;
         pinionMesh.castShadow = true;
-        rotatingPinionAssembly.add(pinionMesh);
+        pinionGroup.add(pinionMesh);
 
-        // Cubo superior do pinhão com chanfro e parafuso de travamento
-        const pinionHub = new THREE.Mesh(
-            new THREE.CylinderGeometry(8.5, 9.5, 5, 24),
+        // Cubo superior do pinhão com parafuso de fixação
+        const pinionTopHub = new THREE.Mesh(
+            new THREE.CylinderGeometry(8.5, 9.5, 4.0, 24),
             MATS.polishedSteel
         );
-        pinionHub.position.y = pinionY + pinionFaceWidth/2 + 2.5;
-        rotatingPinionAssembly.add(pinionHub);
+        pinionTopHub.position.y = pinionY + pinionFaceWidth / 2 + 2.0;
+        pinionGroup.add(pinionTopHub);
 
-        // Ponta de extensão do eixo acima do pinhão (fiel a Solucao2.png)
-        const shaftTopStub = new THREE.Mesh(
-            new THREE.CylinderGeometry(CONFIG.shaftDiameter/2, CONFIG.shaftDiameter/2, 8, 24),
-            MATS.polishedSteel
+        // --- 6.7. ACOPLAMENTO DE JUNTA FLEXÍVEL (Intermediário entre Pinhão e Encoder) ---
+        // Fiel à imagem de referência: corpo cilíndrico usinado em alumínio com fendas helicoidais
+        // e dois parafusos Allen transversais em cada flange de aperto.
+        const couplingGroup = new THREE.Group();
+        const couplingCenterY = 100.0;
+        couplingGroup.position.set(0, couplingCenterY, 0);
+        carriageAssembly.add(couplingGroup);
+
+        const cDiam = 26.0;
+        const hubH = 11.0;
+        const flexH = 14.0;
+        const totalCouplingH = hubH * 2 + flexH; // 36 mm
+
+        // 1. Cubo inferior de aperto do acoplamento flexível
+        const cLowerHub = new THREE.Mesh(
+            new THREE.CylinderGeometry(cDiam / 2, cDiam / 2, hubH, 32),
+            MATS.aluminumOldham
         );
-        shaftTopStub.position.y = pinionY + pinionFaceWidth/2 + 6.5;
-        rotatingPinionAssembly.add(shaftTopStub);
+        cLowerHub.position.set(0, -flexH / 2 - hubH / 2, 0); // y = -12.5 local
+        cLowerHub.castShadow = true;
+        couplingGroup.add(cLowerHub);
+
+        // Fenda de fixação e parafusos Allen do cubo inferior
+        const cSlotMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.5 });
+        const cSlot1 = new THREE.Mesh(new THREE.BoxGeometry(1.6, hubH - 1, cDiam / 2 + 2), cSlotMat);
+        cSlot1.position.set(0, -flexH / 2 - hubH / 2, cDiam / 4);
+        couplingGroup.add(cSlot1);
+
+        const cBolt1 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 9, 12), MATS.blackBolt);
+        cBolt1.rotation.z = Math.PI / 2;
+        cBolt1.position.set(0, -flexH / 2 - hubH / 2 - 2.2, cDiam / 2 - 3.2);
+        couplingGroup.add(cBolt1);
+
+        const cBolt2 = cBolt1.clone();
+        cBolt2.position.y += 4.5;
+        couplingGroup.add(cBolt2);
+
+        // 2. Seção intermediária flexível (fendas helicoidais usinadas tipo feixe / bellows)
+        const cFlexBody = new THREE.Mesh(
+            new THREE.CylinderGeometry(cDiam / 2 - 0.2, cDiam / 2 - 0.2, flexH, 32),
+            MATS.aluminumOldham
+        );
+        cFlexBody.position.set(0, 0, 0);
+        cFlexBody.castShadow = true;
+        couplingGroup.add(cFlexBody);
+
+        // 5 ranhuras horizontais circulares de alta definição representando as espiras de flexão
+        for (let g = -4; g <= 4; g += 2) {
+            const groove = new THREE.Mesh(
+                new THREE.TorusGeometry(cDiam / 2 - 0.15, 0.75, 8, 32),
+                cSlotMat
+            );
+            groove.rotation.x = Math.PI / 2;
+            groove.position.y = g * 1.3;
+            couplingGroup.add(groove);
+        }
+
+        // 3. Cubo superior de aperto do acoplamento flexível
+        const cUpperHub = new THREE.Mesh(
+            new THREE.CylinderGeometry(cDiam / 2, cDiam / 2, hubH, 32),
+            MATS.aluminumOldham
+        );
+        cUpperHub.position.set(0, flexH / 2 + hubH / 2, 0); // y = +12.5 local
+        cUpperHub.castShadow = true;
+        couplingGroup.add(cUpperHub);
+
+        // Fenda de fixação e parafusos Allen do cubo superior
+        const cSlot2 = new THREE.Mesh(new THREE.BoxGeometry(1.6, hubH - 1, cDiam / 2 + 2), cSlotMat);
+        cSlot2.position.set(0, flexH / 2 + hubH / 2, cDiam / 4);
+        couplingGroup.add(cSlot2);
+
+        const cBolt3 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 9, 12), MATS.blackBolt);
+        cBolt3.rotation.z = Math.PI / 2;
+        cBolt3.position.set(0, flexH / 2 + hubH / 2 - 2.2, cDiam / 2 - 3.2);
+        couplingGroup.add(cBolt3);
+
+        const cBolt4 = cBolt3.clone();
+        cBolt4.position.y += 4.5;
+        couplingGroup.add(cBolt4);
+
+        // --- 6.8. ENCODER ABSOLUTO MULTIVOLTAS (Na Parte Superior) ---
+        // Na nova arquitetura, o encoder é montado no topo, com a carcaça voltada para cima
+        // e o eixo de entrada estendendo-se para baixo até o acoplamento flexível.
+        const encoderBodyGroup = new THREE.Group();
+        carriageAssembly.add(encoderBodyGroup);
+
+        const encoderBodyH = 38.0;
+        const encoderBodyDiam = 42.0;
+        const encoderBodyCenterY = 146.0; // Centro do encoder no topo
+
+        // Eixo de entrada do encoder (solidário à rotação do pinhão via acoplamento)
+        const encShaftGeo = new THREE.CylinderGeometry(CONFIG.shaftDiameter / 2, CONFIG.shaftDiameter / 2, 22.0, 32);
+        const encShaftMesh = new THREE.Mesh(encShaftGeo, MATS.polishedSteel);
+        encShaftMesh.position.set(0, 118.0, 0); // Penetra no cubo superior do acoplamento
+        rotatingEncoderShaft.add(encShaftMesh);
+        encoderBodyGroup.add(rotatingEncoderShaft);
+
+        // Colar flange inferior do encoder
+        const encNeck = new THREE.Mesh(
+            new THREE.CylinderGeometry(12.0, 14.0, 6.0, 32),
+            MATS.encoderFlange
+        );
+        encNeck.position.set(0, 126.0, 0);
+        encoderBodyGroup.add(encNeck);
+
+        // Carcaça metálica cilíndrica do encoder industrial
+        const encBodyGeo = new THREE.CylinderGeometry(encoderBodyDiam / 2, encoderBodyDiam / 2, encoderBodyH, 36);
+        const encBodyMesh = new THREE.Mesh(encBodyGeo, MATS.encoderHousing);
+        encBodyMesh.position.set(0, encoderBodyCenterY, 0);
+        encBodyMesh.castShadow = true;
+        encoderBodyGroup.add(encBodyMesh);
+
+        // Janela de inspeção / status LED frontal do encoder (fiel à imagem Gemini)
+        const winWidth = 14.0;
+        const winHeight = 8.0;
+        const winDepth = 3.0;
+        const windowFrame = new THREE.Mesh(
+            new THREE.BoxGeometry(winWidth, winHeight, winDepth),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.3 })
+        );
+        windowFrame.position.set(0, encoderBodyCenterY - 3, encoderBodyDiam / 2 - 0.5);
+        encoderBodyGroup.add(windowFrame);
+
+        // Vidro / visor óptico interno da janela com display colorido
+        const windowGlass = new THREE.Mesh(
+            new THREE.BoxGeometry(winWidth - 2, winHeight - 2, 1.0),
+            new THREE.MeshPhysicalMaterial({ color: 0x00f0ff, transmission: 0.85, roughness: 0.1, clearcoat: 1.0 })
+        );
+        windowGlass.position.set(0, encoderBodyCenterY - 3, encoderBodyDiam / 2 + 0.8);
+        encoderBodyGroup.add(windowGlass);
+
+        // Elementos internos visíveis através do visor (disco óptico graduado em miniatura)
+        const discTraceMat = new THREE.MeshBasicMaterial({ color: 0x10e080 });
+        const discTrace = new THREE.Mesh(new THREE.BoxGeometry(winWidth - 4, 1.5, 0.5), discTraceMat);
+        discTrace.position.set(0, encoderBodyCenterY - 3, encoderBodyDiam / 2 + 0.3);
+        encoderBodyGroup.add(discTrace);
+
+        // Terminal elétrico / barramento de pinos no topo traseiro do encoder
+        const connBlock = new THREE.Mesh(
+            new THREE.BoxGeometry(16.0, 6.0, 8.0),
+            new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 })
+        );
+        connBlock.position.set(0, encoderBodyCenterY + encoderBodyH / 2 - 2, -encoderBodyDiam / 2 + 6);
+        encoderBodyGroup.add(connBlock);
+
+        // Pinos dourados de conexão
+        for (let p = -5; p <= 5; p += 2.5) {
+            const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 4, 8), MATS.brass);
+            pin.position.set(p, encoderBodyCenterY + encoderBodyH / 2 + 1, -encoderBodyDiam / 2 + 6);
+            encoderBodyGroup.add(pin);
+        }
+
+        // Flange superior de fixação da carcaça do encoder (que apoia na base em L)
+        const topFlangeGeo = new THREE.CylinderGeometry(18.0, 19.0, 4.0, 32);
+        const topFlangeMesh = new THREE.Mesh(topFlangeGeo, MATS.encoderFlange);
+        topFlangeMesh.position.set(0, encoderBodyCenterY + encoderBodyH / 2 + 2, 0); // y = 167.0 mm
+        encoderBodyGroup.add(topFlangeMesh);
+
+        // Cabo flexível saindo da carcaça em direção ao armário elétrico do telescópio
+        const cableCurve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0, encoderBodyCenterY + encoderBodyH / 2, -encoderBodyDiam / 2 + 2),
+            new THREE.Vector3(0, encoderBodyCenterY + 25, -encoderBodyDiam / 2 - 15),
+            new THREE.Vector3(25, 120, -50),
+            new THREE.Vector3(45, CONFIG.baseThickness + 5, -80)
+        ]);
+        const cableGeo = new THREE.TubeGeometry(cableCurve, 40, 2.4, 12, false);
+        const cableMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.75, metalness: 0.1 });
+        const cableMesh = new THREE.Mesh(cableGeo, cableMat);
+        cableMesh.castShadow = true;
+        carriageAssembly.add(cableMesh);
+
+        // --- 6.8.1. BASE PARA FIXAÇÃO DA CARCAÇA DO ENCODER (Suporte Estrutural em L) ---
+        // Conforme a imagem de referência (Gemini_Generated_Image_bh6gtabh6gtabh6g.jfif):
+        // Um suporte estrutural vertical em forma de "L" invertido rígido sobe a partir do
+        // patim móvel / mancal e sustenta rigidamente a carcaça do encoder pelo topo.
+        const encoderBracketGroup = new THREE.Group();
+        carriageAssembly.add(encoderBracketGroup);
+
+        const bracketColThickX = 8.0;
+        const bracketColDepthZ = 28.0;
+        const bracketColHeightY = 142.0; // Altura da coluna do patim (y=34) até a placa superior (y=176)
+        const bracketColX = 27.0;        // Coluna posicionada à direita da mecânica (x = +27 mm)
+
+        // Coluna Vertical Rígida em Aço Escovado
+        const bracketColGeo = new THREE.BoxGeometry(bracketColThickX, bracketColHeightY, bracketColDepthZ);
+        const bracketColMesh = new THREE.Mesh(bracketColGeo, MATS.brushedSteel);
+        bracketColMesh.position.set(bracketColX, carriageTopY + bracketColHeightY / 2, 0); // Centro em y = 105.0 mm
+        bracketColMesh.castShadow = true;
+        bracketColMesh.receiveShadow = true;
+        encoderBracketGroup.add(bracketColMesh);
+
+        // Parafusos de fixação da base da coluna no patim móvel
+        const bBaseBolt1 = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 8, 12), MATS.blackBolt);
+        bBaseBolt1.position.set(bracketColX, carriageTopY + 4, -8);
+        encoderBracketGroup.add(bBaseBolt1);
+
+        const bBaseBolt2 = bBaseBolt1.clone();
+        bBaseBolt2.position.z = 8;
+        encoderBracketGroup.add(bBaseBolt2);
+
+        // Placa Horizontal Superior (Aba do L invertido sobre o encoder)
+        const bracketTopLenX = 58.0;  // Estende-se de x = +31 até x = -27 (cobre todo o topo do encoder)
+        const bracketTopDepthZ = 46.0;
+        const bracketTopThickY = 10.0;
+        const bracketTopY = carriageTopY + bracketColHeightY - bracketTopThickY / 2; // y = 171.0 mm
+
+        const bracketTopGeo = new THREE.BoxGeometry(bracketTopLenX, bracketTopThickY, bracketTopDepthZ);
+        const bracketTopMesh = new THREE.Mesh(bracketTopGeo, MATS.brushedSteel);
+        bracketTopMesh.position.set(bracketColX - bracketTopLenX / 2 + bracketColThickX / 2, bracketTopY, 0);
+        bracketTopMesh.castShadow = true;
+        bracketTopMesh.receiveShadow = true;
+        encoderBracketGroup.add(bracketTopMesh);
+
+        // Rebaixo circular de centralização do encoder na face superior
+        const centerCapGeo = new THREE.CylinderGeometry(15.0, 15.0, 1.2, 32);
+        const centerCapMesh = new THREE.Mesh(centerCapGeo, MATS.polishedSteel);
+        centerCapMesh.position.set(0, bracketTopY + bracketTopThickY / 2 + 0.6, 0);
+        encoderBracketGroup.add(centerCapMesh);
+
+        // 4 Parafusos Allen na placa superior prendendo a carcaça do encoder (visíveis no CAD)
+        const topBoltDist = 13.0;
+        [
+            [-topBoltDist, -topBoltDist],
+            [ topBoltDist, -topBoltDist],
+            [-topBoltDist,  topBoltDist],
+            [ topBoltDist,  topBoltDist]
+        ].forEach(([bx, bz]) => {
+            const tBolt = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 4, 12), MATS.blackBolt);
+            tBolt.position.set(bx, bracketTopY + bracketTopThickY / 2 + 1.2, bz);
+            encoderBracketGroup.add(tBolt);
+
+            const tHex = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 2, 6), MATS.carriageBody);
+            tHex.position.set(bx, bracketTopY + bracketTopThickY / 2 + 2.3, bz);
+            encoderBracketGroup.add(tHex);
+        });
 
         // Adicionar subconjuntos rotativos ao carriageAssembly
-        carriageAssembly.add(rotatingEncoderShaft);
         carriageAssembly.add(rotatingPinionAssembly);
 
         // --- 6.9. CREMALHEIRA CIRCULAR E CÚPULA COM MECANISMO NO INTERIOR ---
@@ -1848,29 +1975,43 @@
         // Componentes para rotulação e translação explodida
         const EXPLODE_ITEMS = [
             {
-                name: "Pinhão Leitor e Eixo (Z=20, M=2)",
-                sub: "Eixo usinado e engrenagem de dentes retos",
-                object: rotatingPinionAssembly,
-                vector: new THREE.Vector3(0, 45, 0),
+                name: "Base para Fixação da Carcaça do Encoder",
+                sub: "Suporte vertical rígido em L montado no patim",
+                object: encoderBracketGroup,
+                vector: new THREE.Vector3(28, 25, 0),
+                posOffset: new THREE.Vector3(15, 10, 0)
+            },
+            {
+                name: "Encoder Absoluto Multivoltas (Superior)",
+                sub: "Carcaça industrial montada no topo (12/12 bits)",
+                object: encoderBodyGroup,
+                vector: new THREE.Vector3(0, 48, 0),
                 posOffset: new THREE.Vector3(0, 10, 0)
             },
             {
-                name: "Acoplamento Oldham",
-                sub: "Baixa folga torsional e absorção angular",
+                name: "Acoplamento de Junta Flexível",
+                sub: "Espiras helicoidais de isolamento de carga radial",
                 object: couplingGroup,
-                vector: new THREE.Vector3(0, 25, 0),
+                vector: new THREE.Vector3(0, 26, 0),
                 posOffset: new THREE.Vector3(0, 5, 0)
             },
             {
-                name: "Encoder Absoluto Multivoltas",
-                sub: "12 bits single / 12 bits multi (BiSS/SSI)",
-                object: encoderBodyMesh,
-                vector: new THREE.Vector3(0, 10, 0),
-                posOffset: new THREE.Vector3(0, 0, 0)
+                name: "Pinhão Leitor e Eixo (Z=20, M=2)",
+                sub: "Engrenamento direto dente a dente na cremalheira",
+                object: rotatingPinionAssembly,
+                vector: new THREE.Vector3(0, 12, 0),
+                posOffset: new THREE.Vector3(0, 4, 0)
             },
             {
-                name: "Patim Guia Linear MGN15",
-                sub: "Liberdade radial para absorver runout",
+                name: "Mancal Duplo de Rolamentos",
+                sub: "Fixo diretamente no patim da guia linear",
+                object: doubleBearingGroup,
+                vector: new THREE.Vector3(0, 4, 0),
+                posOffset: new THREE.Vector3(0, 2, 0)
+            },
+            {
+                name: "Guia Linear MGN15 (Patim Móvel)",
+                sub: "Liberdade radial em X para absorver runout",
                 object: carriageBodyMesh,
                 vector: new THREE.Vector3(0, -10, 0),
                 posOffset: new THREE.Vector3(0, 0, 0)
@@ -1879,19 +2020,19 @@
                 name: "Mola Helicoidal de Pré-Carga",
                 sub: "Garante engrenamento contínuo sem folga",
                 object: springMesh,
-                vector: new THREE.Vector3(20, 0, 0),
+                vector: new THREE.Vector3(25, 0, 0),
                 posOffset: new THREE.Vector3(0, 0, 0)
             },
             {
                 name: "Base Fixa do Observatório",
-                sub: "Estrutura rígida de suporte em alumínio",
+                sub: "Estrutura rígida de suporte em metal",
                 object: baseMesh,
                 vector: new THREE.Vector3(0, -25, 0),
                 posOffset: new THREE.Vector3(0, 0, 0)
             },
             {
                 name: "Cremalheira da Cúpula (Z=1200)",
-                sub: "Segmento anular montado na base móvel",
+                sub: "Segmento anular montado no perímetro da cúpula",
                 object: rackAssembly,
                 vector: new THREE.Vector3(-35, 0, 0),
                 posOffset: new THREE.Vector3(0, 0, 0)
@@ -2215,17 +2356,17 @@
         // --- PRESETS DE CÂMERA ---
         // 1. Isométrica Geral (Enquadra Cúpula e Mecanismo no Interior)
         document.getElementById('btn-cam-iso').addEventListener('click', () => {
-            setCameraPreset(new THREE.Vector3(170, 160, 230), new THREE.Vector3(40, 50, 0));
+            setCameraPreset(new THREE.Vector3(180, 160, 240), new THREE.Vector3(20, 85, 0));
         });
 
         // 2. Perfil CAD Exato (Alinhamento idêntico à imagem Solucao2.png)
         document.getElementById('btn-cam-cad').addEventListener('click', () => {
-            setCameraPreset(new THREE.Vector3(0, 55, 170), new THREE.Vector3(0, 55, 0));
+            setCameraPreset(new THREE.Vector3(0, 95, 230), new THREE.Vector3(0, 95, 0));
         });
 
         // 3. Foco no Engrenamento do Pinhão com a Cremalheira Interna
         document.getElementById('btn-cam-gear').addEventListener('click', () => {
-            setCameraPreset(new THREE.Vector3(25, 135, 75), new THREE.Vector3(-10, 110, 0));
+            setCameraPreset(new THREE.Vector3(25, 95, 75), new THREE.Vector3(-15, 68, 0));
         });
 
         // 4. Foco na Mola, Patim e Trilho Linear
