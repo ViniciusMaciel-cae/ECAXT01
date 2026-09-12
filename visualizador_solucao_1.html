@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>SRMIE &#8212; Cupula Astronomica 3D v3</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      background: #06091a;
+      overflow: hidden;
+    }
+
+    #c {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #ui {
+      position: absolute;
+      top: 50px;
+      left: 20px;
+      z-index: 1000;
+      width: 270px;
+      pointer-events: auto;
+      background: rgba(6, 10, 22, .94);
+      border: 1px solid rgba(56, 189, 248, .18);
+      border-radius: 14px;
+      backdrop-filter: blur(14px);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, .75), 0 0 0 1px rgba(56, 189, 248, .05);
+    }
+
+    .hdr {
+      padding: 14px 16px 10px;
+      background: linear-gradient(135deg, rgba(56, 189, 248, .09), rgba(52, 211, 153, .04));
+      border-bottom: 1px solid rgba(56, 189, 248, .12);
+      border-radius: 14px 14px 0 0;
+    }
+
+    .hdr h1 {
+      font-size: 11px;
+      font-weight: 800;
+      color: #38bdf8;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .hdr p {
+      font-size: 9.5px;
+      color: #2d4060;
+      margin-top: 2px;
+    }
+
+    .sec {
+      padding: 11px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, .05);
+    }
+
+    .sec:last-child {
+      border-bottom: none;
+      border-radius: 0 0 14px 14px;
+    }
+
+    .slbl {
+      font-size: 9px;
+      font-weight: 700;
+      color: #2d4060;
+      text-transform: uppercase;
+      letter-spacing: .13em;
+      margin-bottom: 8px;
+    }
+
+    .cb {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, .07);
+      background: transparent;
+      border-radius: 7px;
+      padding: 8px 10px;
+      margin-bottom: 5px;
+      color: #546070;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all .18s;
+      text-align: left;
+      font-family: inherit;
+    }
+
+    .cb:last-child {
+      margin-bottom: 0;
+    }
+
+    .cb:hover {
+      background: rgba(56, 189, 248, .09);
+      color: #b0c8d8;
+      border-color: rgba(56, 189, 248, .28);
+    }
+
+    .cb.on {
+      background: rgba(56, 189, 248, .14);
+      color: #38bdf8;
+      border-color: rgba(56, 189, 248, .44);
+      box-shadow: 0 0 12px rgba(56, 189, 248, .14);
+    }
+
+    .tr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, .04);
+    }
+
+    .tr:last-child {
+      border-bottom: none;
+    }
+
+    .tl {
+      font-size: 11px;
+      color: #546070;
+      user-select: none;
+    }
+
+    .sw {
+      position: relative;
+      width: 42px;
+      height: 22px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .sw input {
+      opacity: 0;
+      position: absolute;
+      width: 0;
+      height: 0;
+    }
+
+    .sw-t {
+      position: absolute;
+      inset: 0;
+      background: #0f1e30;
+      border-radius: 11px;
+      border: 1px solid rgba(255, 255, 255, .07);
+      transition: .25s;
+    }
+
+    .sw-k {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      background: #253545;
+      border-radius: 50%;
+      transition: .25s;
+    }
+
+    .sw input:checked~.sw-t {
+      background: #0a6090;
+    }
+
+    .sw input:checked~.sw-k {
+      transform: translateX(20px);
+      background: #fff;
+      box-shadow: 0 0 8px rgba(56, 189, 248, .5);
+    }
+
+    .live {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(52, 211, 153, .08);
+      border: 1px solid rgba(52, 211, 153, .2);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 9px;
+      color: #34d399;
+      margin-bottom: 8px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      background: #34d399;
+      border-radius: 50%;
+      animation: pk 1.4s ease-in-out infinite;
+    }
+
+    @keyframes pk {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1)
+      }
+
+      50% {
+        opacity: .3;
+        transform: scale(.8)
+      }
+    }
+
+    .ti {
+      margin-bottom: 10px;
+    }
+
+    .ti:last-child {
+      margin-bottom: 0;
+    }
+
+    .tk {
+      font-size: 9.5px;
+      color: #2d4060;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+    }
+
+    .tv {
+      font-size: 21px;
+      font-weight: 700;
+      color: #34d399;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+      margin-top: 1px;
+    }
+
+    .tu {
+      font-size: 10px;
+      font-weight: 400;
+      color: #2d4060;
+    }
+
+    .inf {
+      margin-top: 10px;
+      padding: 9px;
+      background: rgba(0, 0, 0, .4);
+      border-radius: 7px;
+      font-size: 10px;
+      color: #2a3a50;
+      line-height: 1.8;
+      border: 1px solid rgba(255, 255, 255, .04);
+    }
+
+    .inf span {
+      color: #38bdf8;
+      font-weight: 600;
+    }
+
+    .inf b {
+      color: #34d399;
+    }
+
+    #lbls {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 500;
+    }
+
+    .lbl {
+      position: absolute;
+      display: none;
+      background: rgba(6, 10, 22, .9);
+      border: 1px solid rgba(56, 189, 248, .4);
+      border-radius: 5px;
+      padding: 3px 9px;
+      font-size: 9.5px;
+      color: #38bdf8;
+      white-space: nowrap;
+      font-family: 'Segoe UI', sans-serif;
+      pointer-events: none;
+      transform: translate(-50%, -130%);
+    }
+
+    .lbl-r {
+      border-color: rgba(239, 68, 68, .45);
+      color: #f87171;
+    }
+
+    .lbl-o {
+      border-color: rgba(245, 158, 11, .45);
+      color: #fbbf24;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+  <!-- Botão Voltar ao Início -->
+  <a href="Projeto_GJV.html"
+    style="position: fixed; top: 10px; left: 20px; z-index: 99999; background-color: rgba(11, 17, 32, 0.9); color: #38bdf8; padding: 6px 12px; font-size: 15px; text-decoration: none; font-family: sans-serif; font-weight: bold; border-radius: 6px; border: 1px solid #38bdf8; backdrop-filter: blur(5px); box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer;">
+    ⬅ Voltar ao Início
+  </a>
+  <div id="ui">
+    <div class="hdr">
+      <h1>SRMIE &#8212; C&uacute;pula 3D</h1>
+      <p>M&oacute;dulo Compacto &middot; Pedestal Elevado com Mola</p>
+    </div>
+    <div class="sec">
+      <div class="slbl">&#x1F4F7; C&acirc;meras de Inspe&ccedil;&atilde;o</div>
+      <button class="cb" id="b-ov" onclick="setCam('ov')">&#x1F30C; Panor&acirc;mica Global</button>
+      <button class="cb on" id="b-ma" onclick="setCam('ma')">&#x1F52C; M&oacute;dulo SRMIE &amp; Mola</button>
+      <button class="cb" id="b-sr" onclick="setCam('sr')">&#x1F50D; Roda &amp; Encoder Superior</button>
+      <button class="cb" id="b-mo" onclick="setCam('mo')">&#x2699;&#xFE0F; Motor de Tra&ccedil;&atilde;o</button>
+      <button class="cb" id="b-po" onclick="setCam('po')">&#x1F4CD; Contato no Trilho</button>
+    </div>
+    <div class="sec">
+      <div class="slbl">&#x1F3DB; Recursos &amp; Anima&ccedil;&atilde;o</div>
+      <div class="tr">
+        <span class="tl">&#x1F578;&#xFE0F; Modo Wireframe</span>
+        <label class="sw"><input type="checkbox" id="t-wf" onchange="setWire(this.checked)">
+          <div class="sw-t"></div>
+          <div class="sw-k"></div>
+        </label>
+      </div>
+      <div class="tr">
+        <span class="tl">&#x1F504; Rota&ccedil;&atilde;o da C&uacute;pula</span>
+        <select id="s-dir" onchange="setDir(this.value)"
+          style="background:#0f1e30;color:#38bdf8;border:1px solid rgba(56,189,248,.2);border-radius:4px;font-size:10px;padding:2px 4px;outline:none;cursor:pointer;">
+          <option value="1" selected>Direita (+)</option>
+          <option value="0">Pausado</option>
+          <option value="-1">Esquerda (-)</option>
+        </select>
+      </div>
+      <div class="tr">
+        <span class="tl">&#x1F6AA; Portas da C&uacute;pula - ON/OFF</span>
+        <label class="sw"><input type="checkbox" id="t-dr" onchange="setDoor(this.checked)">
+          <div class="sw-t"></div>
+          <div class="sw-k"></div>
+        </label>
+      </div>
+      <div class="tr">
+        <span class="tl">&#x26A0;&#xFE0F; Simular Ovaliza&ccedil;&atilde;o/Erro</span>
+        <label class="sw"><input type="checkbox" id="t-wob" onchange="setWob(this.checked)">
+          <div class="sw-t"></div>
+          <div class="sw-k"></div>
+        </label>
+      </div>
+      <div class="tr">
+        <span class="tl">&#x1F3F7;&#xFE0F; Marcadores T&eacute;cnicos</span>
+        <label class="sw"><input type="checkbox" id="t-lb" onchange="setLbls(this.checked)">
+          <div class="sw-t"></div>
+          <div class="sw-k"></div>
+        </label>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="slbl">&#x1F4CA; Telemetria</div>
+      <div class="live"><span class="dot"></span>LIVE</div>
+      <div class="ti">
+        <div class="tk">Azimute da C&uacute;pula</div>
+        <div class="tv" id="v-az">0.00 <span class="tu">&deg;</span></div>
+      </div>
+      <div class="ti">
+        <div class="tk">Pulsos Encoder (x4)</div>
+        <div class="tv" id="v-p">0 <span class="tu">pulsos</span></div>
+      </div>
+      <div class="ti">
+        <div class="tk">Resolu&ccedil;&atilde;o do Sistema</div>
+        <div class="tv" style="color:#38bdf8;font-size:14px">0.0029 <span class="tu">&deg; / 0.175'</span></div>
+      </div>
+      <div class="inf">
+        R/r = 1500/50 = <span>30</span> &middot; PPR&times;4&times;30 = <b>122.880</b><br>
+        &delta;&theta; = 360 &divide; 122880 = <span>0.0029&deg;</span>
+      </div>
+    </div>
+  </div>
+  <div id="lbls">
+    <div class="lbl" id="L0">&#x1F7E2; Roda SRMIE + Encoder</div>
+    <div class="lbl lbl-o" id="L1">&#x2699;&#xFE0F; Mola de Press&atilde;o &amp; Sapata</div>
+    <div class="lbl lbl-r" id="L2">&#x1F534; Motor de Tra&ccedil;&atilde;o</div>
+    <div class="lbl" id="L3">&#x2B21; Trilho Guia (Anel)</div>
+    <div class="lbl lbl-r" id="L-old" style="font-weight:bold;">&#x26A0; Leitor Fixo</div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    'use strict';
+    // ===== CONSTANTS =============================================================
+    var DR = 1.5, WR = 0.05, TWR = 0.085, RATIO = 30, PPR = 1024, TOTAL = PPR * 4 * RATIO;
+    var OMEGA = 0.22, WALL_H = 0.85, SLIT_H = 0.13, DOOR_OPEN = Math.PI / 5.5;
+    var APY = 0.006;
+    var MANG = Math.PI * 5 / 6;
+
+    // Cota de contato do anel dourado interno: X = -(DR - r_tube) = -(1.500 - 0.030) = -1.470m
+    // Centro da roda e eixo vertical do pedestal a repouso: X_ped = -1.470 + WR = -1.420m
+    var PED_NOM_X = -1.420;
+    var armLinearX = PED_NOM_X;
+
+    // Cota X do batente traseiro da mola na base elevada
+    var FLOOR_STOP_X = -1.230;
+    var CARRIAGE_REAR_OFFSET = 0.070; // Distância do centro do pedestal até o batente móvel da sapata
+    var SPR_NOM_LEN = Math.abs((PED_NOM_X + CARRIAGE_REAR_OFFSET) - FLOOR_STOP_X); // ~0.120m
+
+    // Altura do sistema elevado compacto:
+    // O piso do observatório está em Y = 0.
+    // A base elevada atua na cota intermediária Y ~ 0.48m, reduzindo a haste vertical em ~67%.
+    var ELEV_BASE_Y = 0.470; // Altura do topo da placa base elevada
+
+    var _sd = new THREE.Vector3();
+    function orientSpring(m, a, b) {
+      _sd.copy(b).sub(a);
+      var l = _sd.length();
+      if (l < 0.001) return;
+      m.position.copy(a);
+      m.lookAt(b);
+      m.scale.z = l / SPR_NOM_LEN;
+    }
+
+    // ===== RENDERER ==============================================================
+    var canvas = document.getElementById('c');
+    var R = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    R.setPixelRatio(Math.min(devicePixelRatio, 2));
+    R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
+    R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 0.88;
+    R.setSize(innerWidth, innerHeight);
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x060914);
+    scene.fog = new THREE.FogExp2(0x060914, 0.072);
+
+    // ===== CAMERA ================================================================
+    var cam = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.01, 60);
+    cam.position.set(-1.02, 0.76, 0.52);
+    var ctrl = new THREE.OrbitControls(cam, R.domElement);
+    ctrl.enableDamping = true; ctrl.dampingFactor = 0.06;
+    ctrl.minDistance = 0.12; ctrl.maxDistance = 15;
+    ctrl.target.set(-1.38, 0.65, 0); ctrl.update();
+
+    // ===== LIGHTS ================================================================
+    function dl(c, i, x, y, z, sh) {
+      var l = new THREE.DirectionalLight(c, i); l.position.set(x, y, z);
+      if (sh) {
+        l.castShadow = true; l.shadow.mapSize.set(2048, 2048);
+        l.shadow.camera.left = l.shadow.camera.bottom = -6;
+        l.shadow.camera.right = l.shadow.camera.top = 6;
+        l.shadow.camera.near = 0.5; l.shadow.camera.far = 26; l.shadow.bias = -0.0004;
+      }
+      scene.add(l); return l;
+    }
+    dl(0xfff2dc, 2.9, 5, 11, 5, true); dl(0x78b0e0, 0.9, -6, 4, -3, false); dl(0xc8d8f0, 0.5, 0, 2, -8, false);
+    scene.add(new THREE.AmbientLight(0x16233a, 2.4));
+    var upl = new THREE.PointLight(0x0a2818, 2.0, 5); upl.position.set(0, -0.2, 0); scene.add(upl);
+
+    // ===== HELPERS & SHARED MATERIALS ============================================
+    function M(c, mr, rn) { return new THREE.MeshStandardMaterial({ color: c, metalness: mr, roughness: rn }); }
+    function mk(geo, mat, sh) { var m = new THREE.Mesh(geo, mat); if (sh) { m.castShadow = true; m.receiveShadow = true; } return m; }
+
+    var matAnodised = new THREE.MeshStandardMaterial({ color: 0x4d6275, metalness: 0.78, roughness: 0.26 });
+    var matBlackAnod = new THREE.MeshStandardMaterial({ color: 0x12171f, metalness: 0.82, roughness: 0.32 });
+    var matPolished = new THREE.MeshStandardMaterial({ color: 0xdde6f0, metalness: 0.95, roughness: 0.08 });
+    var matDarkBolt = new THREE.MeshStandardMaterial({ color: 0x0a0d13, metalness: 0.85, roughness: 0.22 });
+    var matBrush = new THREE.MeshStandardMaterial({ color: 0x9ba8b8, metalness: 0.88, roughness: 0.18 });
+    var matCableYel = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.20, roughness: 0.55 }); // Cabo flexível amarelo
+    var matJBox = new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.75, roughness: 0.35 });
+    var matSeal = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, metalness: 0.70, roughness: 0.35 });
+    var matFoundation = new THREE.MeshStandardMaterial({ color: 0x2d3a48, metalness: 0.65, roughness: 0.45 }); // Pedestal estrutural de aço/concreto
+
+    // ===== FLOOR =================================================================
+    var fm = M(0x14192a, 0.08, 0.88);
+    var fA = mk(new THREE.CylinderGeometry(DR + 0.80, DR + 1.0, 0.20, 64), fm, true); fA.position.y = -0.10; scene.add(fA);
+    var fB = mk(new THREE.CylinderGeometry(DR + 1.05, DR + 1.28, 0.09, 64), fm, true); fB.position.y = -0.205; scene.add(fB);
+
+    // ===== WALL ==================================================================
+    var wR2 = DR + 0.065;
+    var wO = mk(new THREE.CylinderGeometry(wR2, wR2 + 0.04, WALL_H, 80, 1, true), M(0xcfd8e2, 0.06, 0.72), true);
+    wO.position.y = WALL_H / 2; scene.add(wO);
+    var wI = mk(new THREE.CylinderGeometry(wR2 - 0.08, wR2, WALL_H, 80, 1, true), new THREE.MeshStandardMaterial({ color: 0xb6c0cc, roughness: .78, metalness: .03, side: THREE.BackSide }), false);
+    wI.position.y = WALL_H / 2; scene.add(wI);
+    var wC = mk(new THREE.RingGeometry(wR2 - 0.08, wR2 + 0.04, 80), M(0xc0cad4, 0.10, 0.65), false);
+    wC.rotation.x = -Math.PI / 2; wC.position.y = WALL_H; scene.add(wC);
+
+    // ===== GUIDE RAIL ============================================================
+    var rM = mk(new THREE.TorusGeometry(DR, 0.030, 22, 180), new THREE.MeshStandardMaterial({ color: 0xd4a010, metalness: .90, roughness: .16, emissive: 0x281600, emissiveIntensity: .35 }), true);
+    rM.rotation.x = Math.PI / 2; rM.position.y = WALL_H + 0.006; scene.add(rM);
+
+    // ===== DOME GROUP (rotates) ==================================================
+    var dG = new THREE.Group(); dG.position.y = WALL_H; scene.add(dG);
+    var domeMat = new THREE.MeshStandardMaterial({ color: 0xccd4de, roughness: .40, metalness: .14 });
+    var domeSM = mk(new THREE.SphereGeometry(DR, 80, 40, SLIT_H, 2 * Math.PI - 2 * SLIT_H, 0, Math.PI / 2), domeMat, true);
+    dG.add(domeSM);
+    var skirtM = mk(new THREE.CylinderGeometry(DR, DR + 0.026, 0.10, 72), M(0xb8c2ce, 0.22, 0.50), true);
+    skirtM.position.y = -0.05; dG.add(skirtM);
+
+    // Slit frame arcs
+    var beamMat = M(0x708090, 0.72, 0.28);
+    function makeSitArc(phi) {
+      var pts = []; for (var i = 0; i <= 38; i++) {
+        var t = (i / 38) * (Math.PI / 2);
+        pts.push(new THREE.Vector3(Math.sin(t) * Math.cos(phi) * DR, Math.cos(t) * DR, Math.sin(t) * Math.sin(phi) * DR));
+      }
+      return mk(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 38, 0.024, 8, false), beamMat, true);
+    }
+    dG.add(makeSitArc(SLIT_H)); dG.add(makeSitArc(-SLIT_H));
+    var cBr = mk(new THREE.CylinderGeometry(0.016, 0.016, 2 * DR * Math.sin(SLIT_H) * 1.1, 8), beamMat, true);
+    cBr.rotation.z = Math.PI / 2; cBr.position.y = Math.cos(Math.PI / 4) * DR; dG.add(cBr);
+    var btR = mk(new THREE.CylinderGeometry(0.013, 0.013, 2 * DR * Math.sin(SLIT_H) * 1.05, 8), beamMat, true);
+    btR.rotation.z = Math.PI / 2; btR.position.y = 0.012; dG.add(btR);
+
+    // ===== SHUTTER DOORS =========================================================
+    var DDR = DR - 0.007;
+    var dMatR = new THREE.MeshStandardMaterial({ color: 0xaabac8, metalness: .30, roughness: .55, side: THREE.DoubleSide });
+    var dMatL = new THREE.MeshStandardMaterial({ color: 0xaabac8, metalness: .30, roughness: .55, side: THREE.DoubleSide });
+    var ribMat = M(0x8898a8, 0.60, 0.40);
+    function addRibs(grp, ps, pl) {
+      for (var ri = 0; ri < 3; ri++) {
+        var phi = ps + pl * (ri + 0.5) / 3;
+        var rp = []; for (var j = 0; j <= 20; j++) {
+          var t = (j / 20) * (Math.PI / 2);
+          rp.push(new THREE.Vector3(Math.sin(t) * Math.cos(phi) * (DDR + 0.004), Math.cos(t) * (DDR + 0.004), Math.sin(t) * Math.sin(phi) * (DDR + 0.004)));
+        }
+        grp.add(mk(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rp), 20, 0.008, 6, false), ribMat, false));
+      }
+    }
+    var doorRMesh = mk(new THREE.SphereGeometry(DDR, 14, 24, 0, SLIT_H, 0, Math.PI / 2), dMatR, false);
+    var doorRGrp = new THREE.Group(); doorRGrp.add(doorRMesh); addRibs(doorRGrp, 0, SLIT_H); dG.add(doorRGrp);
+    var doorLMesh = mk(new THREE.SphereGeometry(DDR, 14, 24, 2 * Math.PI - SLIT_H, SLIT_H, 0, Math.PI / 2), dMatL, false);
+    var doorLGrp = new THREE.Group(); doorLGrp.add(doorLMesh); addRibs(doorLGrp, 2 * Math.PI - SLIT_H, SLIT_H); dG.add(doorLGrp);
+
+    // =============================================================================
+    // ===== MECANISMO SRMIE COMPACTO: PEDESTAL ELEVADO COM HASTE CURTA RÍGIDA =====
+    // =============================================================================
+
+    // ── 1. PEDESTAL ESTRUTURAL DE FUNDAÇÃO (Apoio no Piso Estático Y = 0) ─────────
+    // Pilar estrutural em perfil I / caixa de aço reforçada que eleva a base até Y ~ 0.47m
+    var foundG = new THREE.Group();
+    scene.add(foundG);
+
+    var foundH = ELEV_BASE_Y - 0.014; // ~0.456m de altura do chão até a base
+    var foundW = 0.28, foundD = 0.16;
+    var foundMidX = (FLOOR_STOP_X + (PED_NOM_X - 0.06)) / 2; // ~ -1.355m
+
+    // Sapata de ancoragem no chão do observatório (concreto / chapa pesada)
+    var foundFloorFlange = mk(new THREE.BoxGeometry(foundW + 0.06, 0.016, foundD + 0.06), matFoundation, true);
+    foundFloorFlange.position.set(foundMidX, 0.008, 0);
+    foundG.add(foundFloorFlange);
+
+    // 4 Chumbadores Parabolt no piso
+    [
+      [foundMidX - 0.14, -0.08], [foundMidX - 0.14, 0.08],
+      [foundMidX + 0.14, -0.08], [foundMidX + 0.14, 0.08]
+    ].forEach(function (p) {
+      var washer = mk(new THREE.CylinderGeometry(0.010, 0.010, 0.002, 16), matPolished, false);
+      washer.position.set(p[0], 0.017, p[1]); foundG.add(washer);
+      var nut = mk(new THREE.CylinderGeometry(0.007, 0.007, 0.006, 6), matDarkBolt, false);
+      nut.position.set(p[0], 0.021, p[1]); foundG.add(nut);
+    });
+
+    // Pilar Central Estrutural (Perfil Tubular em Aço Soldado)
+    var foundPillar = mk(new THREE.BoxGeometry(foundW - 0.04, foundH, foundD - 0.04), matFoundation, true);
+    foundPillar.position.set(foundMidX, 0.016 + foundH / 2, 0);
+    foundG.add(foundPillar);
+
+    // Mísulas de contraventamento estrutural conectando o pilar ao piso
+    [-0.07, 0.07].forEach(function (dz) {
+      var gGeo = new THREE.BufferGeometry();
+      var gVerts = new Float32Array([
+        -0.12, 0, dz, 0.12, 0, dz, 0, foundH * 0.75, dz
+      ]);
+      gGeo.setAttribute('position', new THREE.BufferAttribute(gVerts, 3));
+      gGeo.setIndex([0, 1, 2]); gGeo.computeVertexNormals();
+      var stiffener = mk(gGeo, matFoundation, false);
+      stiffener.position.set(foundMidX, 0.016, 0);
+      foundG.add(stiffener);
+    });
+
+    // Braço estrutural robusto de amarração na parede cilíndrica estática (Zero Flutuação)
+    var wallGussetLen = (foundMidX + foundW / 2) - (-(DR - 0.08));
+    var wallGusset = mk(new THREE.BoxGeometry(0.16, 0.060, 0.12), matFoundation, true);
+    wallGusset.position.set(foundMidX + 0.12, ELEV_BASE_Y - 0.06, 0);
+    foundG.add(wallGusset);
+
+    // ── 2. PLACA BASE ELEVADA (Trilhos Guia, Batente Traseiro e Mola de Pressão) ──
+    var basePlateW = 0.30, basePlateD = 0.14, basePlateT = 0.014;
+    var basePlate = mk(new THREE.BoxGeometry(basePlateW, basePlateT, basePlateD), matAnodised, true);
+    basePlate.position.set(foundMidX, ELEV_BASE_Y - basePlateT / 2, 0);
+    foundG.add(basePlate);
+
+    // 4 Parafusos de fixação da placa base no pedestal estrutural
+    [
+      [foundMidX - 0.12, -0.05], [foundMidX - 0.12, 0.05],
+      [foundMidX + 0.12, -0.05], [foundMidX + 0.12, 0.05]
+    ].forEach(function (p) {
+      var scr = mk(new THREE.CylinderGeometry(0.004, 0.004, 0.005, 6), matDarkBolt, false);
+      scr.position.set(p[0], ELEV_BASE_Y + 0.002, p[1]); foundG.add(scr);
+    });
+
+    // Trilhos Guia Lineares de Precisão na Base Elevada (Duplo perfil paralelo em Z)
+    var railLen = 0.24;
+    [-0.038, 0.038].forEach(function (dz) {
+      var rail = mk(new THREE.BoxGeometry(railLen, 0.008, 0.012), matPolished, false);
+      rail.position.set(foundMidX - 0.015, ELEV_BASE_Y + 0.004, dz);
+      foundG.add(rail);
+      [-0.09, 0, 0.09].forEach(function (dx) {
+        var scr = mk(new THREE.CylinderGeometry(0.002, 0.002, 0.003, 8), matDarkBolt, false);
+        scr.position.set(foundMidX - 0.015 + dx, ELEV_BASE_Y + 0.0085, dz);
+        foundG.add(scr);
+      });
+    });
+
+    // Batente Traseiro Rígido da Mola na Base Elevada
+    var stopH = 0.052;
+    var floorStopPlate = mk(new THREE.BoxGeometry(0.018, stopH, 0.088), matAnodised, true);
+    floorStopPlate.position.set(FLOOR_STOP_X, ELEV_BASE_Y + stopH / 2, 0);
+    foundG.add(floorStopPlate);
+
+    // Mísulas de apoio do batente traseiro contra a força da mola
+    [-0.030, 0.030].forEach(function (dz) {
+      var gGeo = new THREE.BufferGeometry();
+      var gVerts = new Float32Array([
+        0, 0, -0.003, 0.032, 0, -0.003, 0, stopH, -0.003,
+        0, 0, 0.003, 0.032, 0, 0.003, 0, stopH, 0.003
+      ]);
+      gGeo.setAttribute('position', new THREE.BufferAttribute(gVerts, 3));
+      gGeo.setIndex([0, 1, 2, 3, 5, 4, 0, 3, 4, 0, 4, 1, 1, 4, 5, 1, 5, 2, 2, 5, 3, 2, 3, 0]);
+      gGeo.computeVertexNormals();
+      var gus = mk(gGeo, matAnodised, true);
+      gus.position.set(FLOOR_STOP_X, ELEV_BASE_Y, dz);
+      foundG.add(gus);
+    });
+
+    // Copo/Assento Traseiro da Mola Horizontal
+    var sprCenterY = ELEV_BASE_Y + 0.026;
+    var floorSpringCupRear = mk(new THREE.CylinderGeometry(0.018, 0.018, 0.010, 24), matAnodised, true);
+    floorSpringCupRear.rotation.z = Math.PI / 2;
+    floorSpringCupRear.position.set(FLOOR_STOP_X - 0.005, sprCenterY, 0);
+    foundG.add(floorSpringCupRear);
+
+    // Caixa de Junção Elétrica / Terminal CLP na Base Elevada
+    var clpBox = mk(new THREE.BoxGeometry(0.038, 0.030, 0.042), matJBox, true);
+    clpBox.position.set(FLOOR_STOP_X + 0.042, ELEV_BASE_Y + 0.015, -0.042);
+    foundG.add(clpBox);
+
+    var clpTag = mk(new THREE.BoxGeometry(0.020, 0.010, 0.002),
+      new THREE.MeshStandardMaterial({ color: 0xe59b12, metalness: 0.3, roughness: 0.5 }), false);
+    clpTag.position.set(FLOOR_STOP_X + 0.042, ELEV_BASE_Y + 0.018, -0.064);
+    foundG.add(clpTag);
+
+    // ── 3. MOLA HORIZONTAL DE PRESSÃO (Linha Direta de Ação sobre a Sapata) ───────
+    var SPR_COILS_FLOOR = 9;
+    var SPR_R_FLOOR = 0.015;  // Diâmetro de 30mm
+    var SPR_WIRE_FLOOR = 0.0048; // Arame espesso de aço temperado
+    var sprPtsFloor = [];
+    for (var ki = 0; ki <= SPR_COILS_FLOOR * 24; ki++) {
+      var kt = ki / (SPR_COILS_FLOOR * 24);
+      var kang = kt * SPR_COILS_FLOOR * Math.PI * 2;
+      var taper = (kt < 0.08 || kt > 0.92) ? SPR_R_FLOOR * 0.55 : SPR_R_FLOOR;
+      sprPtsFloor.push(new THREE.Vector3(Math.cos(kang) * taper, Math.sin(kang) * taper, kt * SPR_NOM_LEN));
+    }
+    var sprMesh = mk(
+      new THREE.TubeGeometry(new THREE.CatmullRomCurve3(sprPtsFloor), SPR_COILS_FLOOR * 24, SPR_WIRE_FLOOR, 10, false),
+      new THREE.MeshStandardMaterial({
+        color: 0xd8e4ec,
+        metalness: 0.92,
+        roughness: 0.14,
+        envMapIntensity: 1.4
+      }), true);
+    scene.add(sprMesh);
+
+    var sprCapMat = new THREE.MeshStandardMaterial({ color: 0xa0b2c0, metalness: 0.92, roughness: 0.12 });
+    var sprCapA = mk(new THREE.TorusGeometry(0.014, SPR_WIRE_FLOOR * 0.9, 8, 24), sprCapMat, true);
+    scene.add(sprCapA);
+    var sprCapB = mk(new THREE.TorusGeometry(0.014, SPR_WIRE_FLOOR * 0.9, 8, 24), sprCapMat, true);
+    scene.add(sprCapB);
+
+    // ── 4. CONJUNTO MÓVEL DO PEDESTAL COMPACTO (pedestalGroup — Translação 1-DOF) ─
+    var pedestalGroup = new THREE.Group();
+    pedestalGroup.position.set(PED_NOM_X, 0, 0);
+    scene.add(pedestalGroup);
+    var armG = pedestalGroup; // Alias
+
+    // Sapata Móvel Deslizante (Carro de Aço Reforçado sobre os Trilhos)
+    var carriageW = 0.140, carriageD = 0.120, carriageT = 0.014;
+    var carriageY = ELEV_BASE_Y + 0.012; // Cota logo acima dos trilhos
+    var carriagePlate = mk(new THREE.BoxGeometry(carriageW, carriageT, carriageD), matAnodised, true);
+    carriagePlate.position.set(0, carriageY + carriageT / 2, 0);
+    pedestalGroup.add(carriagePlate);
+
+    // 4 Patins Lineares com Raspadores Azuis
+    [-carriageW * 0.34, carriageW * 0.34].forEach(function (cx) {
+      [-0.038, 0.038].forEach(function (cz) {
+        var block = mk(new THREE.BoxGeometry(0.034, 0.012, 0.022), matAnodised, false);
+        block.position.set(cx, carriageY - 0.003, cz); pedestalGroup.add(block);
+        [-0.017, 0.017].forEach(function (sx) {
+          var s = mk(new THREE.BoxGeometry(0.003, 0.013, 0.023), matSeal, false);
+          s.position.set(cx + sx, carriageY - 0.003, cz); pedestalGroup.add(s);
+        });
+      });
+    });
+
+    // Batente / Flange de Pressão Traseira da Sapata (Recebe a Mola)
+    var carriageStopPlate = mk(new THREE.BoxGeometry(0.014, 0.044, 0.064), matAnodised, true);
+    carriageStopPlate.position.set(CARRIAGE_REAR_OFFSET, carriageY + 0.022, 0);
+    pedestalGroup.add(carriageStopPlate);
+
+    var carriageSpringCup = mk(new THREE.CylinderGeometry(0.017, 0.017, 0.008, 24), matAnodised, true);
+    carriageSpringCup.rotation.z = Math.PI / 2;
+    carriageSpringCup.position.set(CARRIAGE_REAR_OFFSET + 0.004, sprCenterY, 0);
+    pedestalGroup.add(carriageSpringCup);
+
+    // 4 Mísulas Triangulares de Reforço Soldando a Coluna Curta à Sapata
+    var colRadius = 0.020;
+    function addColGusset(rotY) {
+      var gGeo = new THREE.BufferGeometry();
+      var gVerts = new Float32Array([
+        0, 0, -0.003, 0.044, 0, -0.003, 0, 0.060, -0.003,
+        0, 0, 0.003, 0.044, 0, 0.003, 0, 0.060, 0.003
+      ]);
+      gGeo.setAttribute('position', new THREE.BufferAttribute(gVerts, 3));
+      gGeo.setIndex([0, 1, 2, 3, 5, 4, 0, 3, 4, 0, 4, 1, 1, 4, 5, 1, 5, 2, 2, 5, 3, 2, 3, 0]);
+      gGeo.computeVertexNormals();
+      var gus = mk(gGeo, matAnodised, true);
+      gus.position.set(0, carriageY + carriageT, 0);
+      gus.rotation.y = rotY;
+      pedestalGroup.add(gus);
+    }
+    addColGusset(0); addColGusset(Math.PI); addColGusset(Math.PI / 2); addColGusset(-Math.PI / 2);
+
+    // ── 5. HASTE VERTICAL CURTA E RÍGIDA (Reduzida em ~67%) ───────────────────────
+    // Altura reduzida para ~0.24m: módulo compacto de altíssima rigidez torsional e flexional
+    var colBtmY = carriageY + carriageT; // ~0.526m
+    var encBtmY = WALL_H + APY - 0.090;  // ~0.766m
+    var colHeight = encBtmY - colBtmY;    // ~0.240m (comprimento compacto ideal!)
+    var colMidY = (colBtmY + encBtmY) / 2;
+
+    var verticalColumn = mk(new THREE.CylinderGeometry(colRadius, colRadius, colHeight, 32), matAnodised, true);
+    verticalColumn.position.set(0, colMidY, 0);
+    pedestalGroup.add(verticalColumn);
+
+    // Friso / colar central usinado
+    var band = mk(new THREE.CylinderGeometry(colRadius + 0.0015, colRadius + 0.0015, 0.008, 32), matBlackAnod, false);
+    band.position.set(0, colMidY, 0);
+    pedestalGroup.add(band);
+
+    // Flange Superior de Acoplamento ao Encoder
+    var topColFlange = mk(new THREE.CylinderGeometry(0.028, 0.028, 0.010, 32), matAnodised, true);
+    topColFlange.position.set(0, encBtmY, 0);
+    pedestalGroup.add(topColFlange);
+
+    for (var fi = 0; fi < 6; fi++) {
+      var fang = fi * Math.PI * 2 / 6;
+      var fScr = mk(new THREE.CylinderGeometry(0.002, 0.002, 0.004, 8), matDarkBolt, false);
+      fScr.position.set(Math.cos(fang) * 0.022, encBtmY + 0.006, Math.sin(fang) * 0.022);
+      pedestalGroup.add(fScr);
+    }
+
+    // ── 6. ENCODER COAXIAL SUBJACENTE (Montado no Topo da Haste, Eixo Vertical) ──
+    var encGroup = new THREE.Group();
+    encGroup.position.set(0, WALL_H + APY - 0.056, 0);
+    pedestalGroup.add(encGroup);
+
+    var encFlangeTop = mk(new THREE.CylinderGeometry(0.024, 0.024, 0.006, 32), matAnodised, false);
+    encFlangeTop.position.y = 0.024;
+    encGroup.add(encFlangeTop);
+
+    var encBody = mk(new THREE.CylinderGeometry(0.020, 0.020, 0.040, 32),
+      new THREE.MeshStandardMaterial({ color: 0x182230, metalness: 0.75, roughness: 0.28, emissive: 0x060d18, emissiveIntensity: 0.5 }), true);
+    encGroup.add(encBody);
+
+    var encStripe = mk(new THREE.CylinderGeometry(0.0208, 0.0208, 0.014, 32), matBrush, false);
+    encGroup.add(encStripe);
+
+    var encCap = mk(new THREE.CylinderGeometry(0.018, 0.018, 0.008, 32), matBlackAnod, true);
+    encCap.position.y = -0.024;
+    encGroup.add(encCap);
+
+    var encFace = mk(new THREE.CircleGeometry(0.007, 18),
+      new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0060b0, emissiveIntensity: 2.2, roughness: 0.3 }), false);
+    encFace.rotation.y = -Math.PI / 2;
+    encFace.position.set(0, 0, 0.0205);
+    encGroup.add(encFace);
+
+    var conStub = mk(new THREE.CylinderGeometry(0.006, 0.006, 0.012, 16), matDarkBolt, false);
+    conStub.position.y = -0.034;
+    encGroup.add(conStub);
+
+    // Eixo Vertical de Acoplamento Direto do Encoder ao Cubo da Roda
+    var shaftLink = mk(new THREE.CylinderGeometry(0.0075, 0.0075, 0.024, 18), matPolished, false);
+    shaftLink.position.set(0, WALL_H + APY - 0.018, 0);
+    pedestalGroup.add(shaftLink);
+
+    // ── 7. RODA DE MEDIÇÃO HORIZONTAL (Eixo Vertical, Contato Tangencial com o Trilho) ──
+    var wheelG = new THREE.Group();
+    wheelG.position.set(0, WALL_H + APY, 0);
+    pedestalGroup.add(wheelG);
+
+    var topCap = mk(new THREE.CylinderGeometry(0.009, 0.009, 0.004, 18), matDarkBolt, false);
+    topCap.position.y = 0.010;
+    wheelG.add(topCap);
+
+    var hubM = mk(new THREE.CylinderGeometry(WR * 0.68, WR * 0.68, 0.014, 36), matAnodised, true);
+    wheelG.add(hubM);
+
+    for (var si = 0; si < 8; si++) {
+      var spk = mk(new THREE.BoxGeometry(WR * 1.12, 0.007, 0.0035),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.95, roughness: 0.12 }), false);
+      spk.rotation.y = si * Math.PI / 4;
+      spk.position.y = 0.0075;
+      wheelG.add(spk);
+    }
+
+    for (var bi = 0; bi < 12; bi++) {
+      var bang = bi * Math.PI * 2 / 12;
+      var bRim = mk(new THREE.CylinderGeometry(0.0022, 0.0022, 0.003, 10),
+        new THREE.MeshStandardMaterial({ color: 0x0d1117, metalness: 0.9, roughness: 0.2 }), false);
+      bRim.position.set(Math.cos(bang) * (WR * 0.58), 0.008, Math.sin(bang) * (WR * 0.58));
+      wheelG.add(bRim);
+    }
+
+    var treadM = mk(new THREE.CylinderGeometry(WR, WR, 0.020, 64), M(0x060606, 0.0, 0.98), true);
+    wheelG.add(treadM);
+
+    [0.006, -0.006].forEach(function (dy) {
+      var gr = mk(new THREE.TorusGeometry(WR - 0.001, 0.0015, 6, 64), M(0x020202, 0.0, 0.99), false);
+      gr.rotation.x = Math.PI / 2;
+      gr.position.y = dy;
+      wheelG.add(gr);
+    });
+
+    var rimFlange = mk(new THREE.TorusGeometry(WR * 0.68, 0.002, 6, 36), matPolished, false);
+    rimFlange.rotation.x = Math.PI / 2;
+    rimFlange.position.y = 0.007;
+    wheelG.add(rimFlange);
+
+    // ── 8. CABO AMARELO BLINDADO (Extensão Compacta e Perfeita ao Longo da Haste) ──
+    var cblHastePts = [
+      new THREE.Vector3(0, WALL_H + APY - 0.090, 0.004),
+      new THREE.Vector3(0, WALL_H + APY - 0.115, colRadius + 0.004),
+      new THREE.Vector3(0, colMidY + 0.040, colRadius + 0.004),
+      new THREE.Vector3(0, colMidY - 0.040, colRadius + 0.004),
+      new THREE.Vector3(0, colBtmY + 0.025, colRadius + 0.004),
+      new THREE.Vector3(0.018, carriageY + 0.015, colRadius + 0.012),
+      new THREE.Vector3(0.052, ELEV_BASE_Y + 0.015, -0.012)
+    ];
+    var cblHasteGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cblHastePts), 28, 0.0032, 8, false);
+    pedestalGroup.add(mk(cblHasteGeo, matCableYel, false));
+
+    // 2 Presilhas usinadas na extensão compacta da haste
+    [colMidY + 0.040, colMidY - 0.040].forEach(function (py) {
+      var clamp = mk(new THREE.BoxGeometry(0.010, 0.006, 0.008), matDarkBolt, false);
+      clamp.position.set(0, py, colRadius + 0.004);
+      pedestalGroup.add(clamp);
+    });
+
+    // Ponto de contato indicador tangencial
+    var glowM = mk(new THREE.SphereGeometry(0.007, 12, 12),
+      new THREE.MeshStandardMaterial({ color: 0x00ff80, emissive: 0x00ff60, emissiveIntensity: 3.2 }), false);
+    scene.add(glowM);
+
+    // ===== MOTOR ASSEMBLY ========================================================
+    var motorG = new THREE.Group(); motorG.position.y = WALL_H; motorG.rotation.y = MANG; scene.add(motorG);
+
+    var mpM = mk(new THREE.BoxGeometry(0.15, 0.22, 0.022), M(0x3c1616, 0.62, 0.44), true);
+    mpM.position.set(-(DR - 0.21), 0.08, 0); mpM.rotation.y = Math.PI / 2; motorG.add(mpM);
+
+    var gbM = mk(new THREE.BoxGeometry(0.12, 0.12, 0.11), M(0x6a1e1e, 0.55, 0.52), true);
+    gbM.position.set(-(DR - 0.165), 0.06, 0); motorG.add(gbM);
+
+    for (var fi = -2; fi <= 2; fi++) {
+      var fn = mk(new THREE.BoxGeometry(0.004, 0.09, 0.09), M(0x581616, 0.52, 0.56), false);
+      fn.position.set(-(DR - 0.165) - 0.065, 0.06, fi * 0.018); motorG.add(fn);
+    }
+
+    var mTube = mk(new THREE.CylinderGeometry(0.040, 0.040, 0.15, 20), M(0x862424, 0.62, 0.40), true);
+    mTube.rotation.z = Math.PI / 2; mTube.position.set(-(DR - 0.295), 0.06, 0); motorG.add(mTube);
+
+    var mCap = mk(new THREE.CylinderGeometry(0.041, 0.041, 0.010, 20), M(0x541414, 0.72, 0.32), false);
+    mCap.rotation.z = Math.PI / 2; mCap.position.set(-(DR - 0.375), 0.06, 0); motorG.add(mCap);
+
+    var tBracket = mk(new THREE.BoxGeometry(0.080, 0.016, 0.038), M(0x5a1818, 0.60, 0.45), true);
+    tBracket.position.set(-(DR - TWR * 0.5 - 0.035), 0.080, 0); motorG.add(tBracket);
+
+    var tBearingTop = mk(new THREE.CylinderGeometry(0.016, 0.016, 0.022, 24), M(0x3a1212, 0.70, 0.35), false);
+    tBearingTop.position.set(-(DR - TWR), 0.075, 0); motorG.add(tBearingTop);
+
+    // Roda de Tração Horizontal Deitada
+    var tWG = new THREE.Group();
+    tWG.position.set(-(DR - TWR), 0.05, 0);
+    motorG.add(tWG);
+
+    var tAxle = mk(new THREE.CylinderGeometry(0.008, 0.008, 0.055, 18), M(0x222222, 0.85, 0.25), false);
+    tWG.add(tAxle);
+
+    var tHub = mk(new THREE.CylinderGeometry(TWR * 0.60, TWR * 0.60, 0.024, 32), M(0x502020, 0.52, 0.62), true);
+    tWG.add(tHub);
+
+    for (var ts = 0; ts < 4; ts++) {
+      var tspk = mk(new THREE.BoxGeometry(TWR * 1.10, 0.009, 0.009), M(0x481818, 0.54, 0.60), false);
+      tspk.rotation.y = ts * Math.PI / 4;
+      tWG.add(tspk);
+    }
+
+    var tTrd = mk(new THREE.CylinderGeometry(TWR, TWR, 0.032, 48), M(0x0a0a0a, 0.0, 0.95), true);
+    tWG.add(tTrd);
+
+    for (var tl = 0; tl < 16; tl++) {
+      var tlang = tl * Math.PI * 2 / 16;
+      var lug = mk(new THREE.BoxGeometry(0.004, 0.034, 0.012), M(0x060606, 0.0, 0.98), false);
+      lug.position.set(Math.cos(tlang) * (TWR - 0.001), 0, Math.sin(tlang) * (TWR - 0.001));
+      lug.rotation.y = -tlang;
+      tWG.add(lug);
+    }
+
+    [0.015, -0.015].forEach(function (dy) {
+      var ring = mk(new THREE.TorusGeometry(TWR * 0.62, 0.0025, 6, 32), M(0x3a1414, 0.65, 0.40), false);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = dy;
+      tWG.add(ring);
+    });
+
+    var mGlow = mk(new THREE.SphereGeometry(0.008, 8, 8),
+      new THREE.MeshStandardMaterial({ color: 0xff2828, emissive: 0xff1010, emissiveIntensity: 2.5 }), false);
+    mGlow.position.set(-DR, 0.05, 0); motorG.add(mGlow);
+
+    // ===== OLD SYSTEM (FIXED TAPE READER) ========================================
+    var oldReaderG = new THREE.Group();
+    oldReaderG.position.set(-DR, WALL_H + 0.05, 0.4);
+    scene.add(oldReaderG);
+    var oldReader = mk(new THREE.BoxGeometry(0.05, 0.08, 0.06), new THREE.MeshStandardMaterial({ color: 0xff2222, transparent: true, opacity: 0.6, emissive: 0xaa0000, emissiveIntensity: 0.5 }), false);
+    oldReaderG.add(oldReader);
+
+    // ===== STATE =================================================================
+    var rotDir = 1, labelsOn = false, doorTarget = 0, doorAng = 0;
+    var domeAng = 0, oscPhase = 0, oscVal = 0, inspMode = false;
+    var wobbleOn = false, wobbleAmt = 0;
+    var camTP = null, camTL = null;
+    var wfMeshes = [domeSM, skirtM, doorRMesh, doorLMesh, oldReader];
+
+    // ===== CAMERA PRESETS ========================================================
+    // Posição 'ma' agora focada de perto nas novas cotas elevadas do módulo compacto
+    var CAMS = {
+      ov: { p: new THREE.Vector3(4.4, 3.2, 4.2), l: new THREE.Vector3(0, 0.9, 0) },
+      ma: { p: new THREE.Vector3(-1.02, 0.76, 0.52), l: new THREE.Vector3(-1.38, 0.65, 0) },
+      sr: { p: new THREE.Vector3(-1.24, 0.96, 0.32), l: new THREE.Vector3(-1.47, 0.86, 0) },
+      mo: { p: new THREE.Vector3(0.67, WALL_H + 0.33, 0.75), l: new THREE.Vector3(1.23, WALL_H + 0.05, 0.71) },
+      po: { p: new THREE.Vector3(-DR + 0.08, WALL_H + APY + 0.015, -0.15), l: new THREE.Vector3(-DR, WALL_H + APY, 0.05) }
+    };
+    var activeCamMode = 'ma';
+    setCam('ma');
+    function setCam(k) {
+      activeCamMode = k;
+      if (k === 'mo') {
+        var targetVec = new THREE.Vector3();
+        tWG.getWorldPosition(targetVec);
+        targetVec.y = WALL_H + 0.05;
+        var rad = new THREE.Vector2(targetVec.x, targetVec.z).normalize();
+        var tan = new THREE.Vector2(-rad.y, rad.x);
+        camTP = new THREE.Vector3(
+          targetVec.x - rad.x * 0.44 + tan.x * 0.32,
+          targetVec.y + 0.28,
+          targetVec.z - rad.y * 0.44 + tan.y * 0.32
+        );
+        camTL = targetVec.clone();
+      } else if (CAMS[k]) {
+        camTP = CAMS[k].p.clone();
+        camTL = CAMS[k].l.clone();
+      }
+      document.querySelectorAll('.cb').forEach(function (b) { b.classList.remove('on'); });
+      document.getElementById('b-' + k).classList.add('on');
+      inspMode = (k !== 'ov'); applyInspect();
+    }
+    function applyInspect() {
+      var op = inspMode ? 0.20 : 1.0;
+      [domeSM, skirtM].forEach(function (m) {
+        m.material.transparent = inspMode; m.material.opacity = op; m.material.depthWrite = !inspMode;
+      });
+    }
+
+    // ===== TOGGLES ===============================================================
+    function setWire(v) { wfMeshes.forEach(function (m) { m.material.wireframe = v; m.material.transparent = v || inspMode; m.material.opacity = v ? 0.5 : (inspMode ? 0.20 : 1.0); }); oldReader.material.opacity = v ? 0.3 : 0.6; }
+    function setDir(v) { rotDir = parseInt(v); }
+    function setDoor(v) { doorTarget = v ? 1 : 0; }
+    function setWob(v) { wobbleOn = v; }
+    function setLbls(v) { labelsOn = v;['L0', 'L1', 'L2', 'L3', 'L-old'].forEach(function (id) { document.getElementById(id).style.display = v ? 'block' : 'none'; }); }
+
+    // ===== LABELS ================================================================
+    var lblW = {
+      L0: new THREE.Vector3(PED_NOM_X, WALL_H + 0.19, 0),
+      L1: new THREE.Vector3((FLOOR_STOP_X + PED_NOM_X) / 2, ELEV_BASE_Y + 0.14, 0),
+      L2: new THREE.Vector3(-Math.cos(MANG) * (DR - TWR), WALL_H + 0.20, Math.sin(MANG) * (DR - TWR)),
+      L3: new THREE.Vector3(DR * 0.72, WALL_H + 0.07, DR * 0.72),
+      'L-old': new THREE.Vector3(-DR, WALL_H + 0.18, 0.4)
+    };
+    function projPt(wp) { var v = wp.clone().project(cam); return { x: (v.x * .5 + .5) * innerWidth, y: (1 - (v.y * .5 + .5)) * innerHeight }; }
+    function updateLabels() {
+      if (!labelsOn) return;
+      lblW.L0.x = armLinearX;
+      lblW.L1.x = (FLOOR_STOP_X + armLinearX + CARRIAGE_REAR_OFFSET) / 2;
+      for (var id in lblW) { var s = projPt(lblW[id]); var el = document.getElementById(id); el.style.left = s.x + 'px'; el.style.top = s.y + 'px'; }
+    }
+
+    // ===== TELEMETRY =============================================================
+    function updateTel() {
+      var az = ((domeAng * 180 / Math.PI) % 360 + 360) % 360;
+      var p = Math.round(az / 360 * TOTAL);
+      document.getElementById('v-az').innerHTML = az.toFixed(2) + ' <span class="tu">&deg;</span>';
+      document.getElementById('v-p').innerHTML = p.toLocaleString('pt-BR') + ' <span class="tu">pulsos</span>';
+    }
+
+    // ===== ANIMATION =============================================================
+    var clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      var dt = Math.min(clock.getDelta(), 0.05), t = clock.getElapsedTime();
+
+      // Door lerp
+      doorAng += (doorTarget - doorAng) * 8 * dt;
+      doorRGrp.rotation.y = doorAng * DOOR_OPEN;
+      doorLGrp.rotation.y = -doorAng * DOOR_OPEN;
+
+      // ── 1. Rotação Suave da Cúpula & Simulação Estável de Ovalização ───────────
+      wobbleAmt += ((wobbleOn ? 0.025 : 0) - wobbleAmt) * 4 * dt;
+      var wobX = Math.cos(domeAng * 2.0) * wobbleAmt;
+      var wobZ = Math.sin(domeAng * 2.0) * wobbleAmt;
+
+      dG.position.x = wobX; dG.position.z = wobZ;
+      rM.position.x = wobX; rM.position.z = wobZ;
+
+      // ── 2. Cinemática de Ação e Reação do Pedestal Elevado Compacto ────────────
+      var targetPedX = PED_NOM_X + wobX;
+      armLinearX += (targetPedX - armLinearX) * 14 * dt; // Resposta mecânica dinâmica
+      pedestalGroup.position.set(armLinearX, 0, 0);
+
+      // Rotação pura da roda de medição e motor
+      if (rotDir !== 0) {
+        var dd = rotDir * OMEGA * dt; domeAng += dd; dG.rotation.y += dd;
+        wheelG.rotation.y += dd * RATIO;
+        tWG.rotation.y += dd * (DR / TWR);
+        encBody.material.emissiveIntensity = 0.5 + 0.4 * Math.abs(Math.sin(t * 16));
+      }
+
+      // Update Old Reader Status
+      var oldMsg = '&#x26A0; Leitor Fixo';
+      var oldEl = document.getElementById('L-old');
+      if (wobbleAmt > 0.01) {
+        if (wobX > 0.01) {
+          oldMsg = '&#x26A0; Sinal Perdido - Gap excessivo';
+          oldReader.material.emissive.setHex(0xff8800);
+        } else if (wobX < -0.01) {
+          oldMsg = '&#x1F4A5; Colis&atilde;o Mec&acirc;nica!';
+          oldReader.material.emissive.setHex(0xff0000);
+        }
+      } else {
+        oldReader.material.emissive.setHex(0xaa0000);
+      }
+      if (oldEl.innerHTML !== oldMsg) oldEl.innerHTML = oldMsg;
+
+      // ── 3. Compressão / Expansão da Mola na Base Elevada em Tempo Real ─────────
+      var sprFloorBase = new THREE.Vector3(FLOOR_STOP_X, sprCenterY, 0);
+      var sprFloorFront = new THREE.Vector3(armLinearX + CARRIAGE_REAR_OFFSET, sprCenterY, 0);
+
+      orientSpring(sprMesh, sprFloorBase, sprFloorFront);
+      sprCapA.position.copy(sprFloorBase);
+      sprCapB.position.copy(sprFloorFront);
+      sprCapA.lookAt(sprFloorFront);
+      sprCapB.lookAt(sprFloorBase);
+
+      // ── 4. Ponto de Contato Físico Firme na Interface (Zero Gap) ───────────────
+      var gwx = armLinearX - WR;
+      var gwy = WALL_H + APY;
+      var gwz = 0;
+      glowM.position.set(gwx, gwy, gwz);
+
+      if (rotDir !== 0) {
+        glowM.material.emissiveIntensity = 2.4 + 1.2 * Math.abs(Math.sin(t * 15));
+        mGlow.material.emissiveIntensity = 1.4 + 0.9 * Math.abs(Math.sin(t * 10 + 1.2));
+      }
+
+      // Dynamic Camera tracking
+      if (activeCamMode === 'dy') {
+        camTL = new THREE.Vector3(gwx, gwy, gwz);
+        camTP = new THREE.Vector3(armLinearX + 0.22, gwy + 0.10, -0.25);
+      }
+
+      // Camera lerp
+      if (camTP) {
+        cam.position.lerp(camTP, 0.055);
+        ctrl.target.lerp(camTL, 0.055);
+        if (activeCamMode !== 'dy' && cam.position.distanceTo(camTP) < 0.003) camTP = null;
+      }
+
+      ctrl.update(); updateLabels(); updateTel(); R.render(scene, cam);
+    }
+    window.addEventListener('resize', function () { cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); R.setSize(innerWidth, innerHeight); });
+    animate();
+  </script>
+</body>
+
+</html>
